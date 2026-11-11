@@ -5,6 +5,8 @@ namespace BleHid.Core;
 /// </summary>
 public static class TouchMapper
 {
+    public const double DefaultVideoAspect = 16.0 / 9.0;
+
     public static bool IsInsideVideo(double x, double y, double viewWidth, double viewHeight, double videoAspect)
     {
         var (left, top, width, height) = VideoRect(viewWidth, viewHeight, videoAspect);

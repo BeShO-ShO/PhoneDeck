@@ -362,7 +362,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
             try
             {
                 await CaptureSession.RunAsync(peripheral, Append, verbose: false, () => PointerIntervalMs,
-                    stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch);
+                    stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch,
+                    touchGoesToHost: AppSettings.Instance.TouchLayerEnabled);
             }
             catch (Exception ex)
             {

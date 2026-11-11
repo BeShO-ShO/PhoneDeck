@@ -117,10 +117,12 @@ public static class CaptureSession
         Func<int> mouseIntervalMs,
         bool stopEndsSession,
         CancellationToken cancellationToken,
-        bool chordSwitch = true)
+        bool chordSwitch = true,
+        bool touchGoesToHost = false)
     {
         using var capture = new InputCapture { Verbose = verbose };
         capture.SetChordSwitch(chordSwitch);
+        capture.SetTouchGoesToHost(touchGoesToHost);
         var stopped = new TaskCompletionSource();
         using var registration = cancellationToken.Register(() => stopped.TrySetResult());
 

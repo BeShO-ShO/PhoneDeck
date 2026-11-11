@@ -49,6 +49,7 @@ public sealed class InputCapture : IDisposable
     private volatile bool _passThrough;
     private volatile bool _running;
     private volatile bool _chordSwitchEnabled = true;
+    private volatile bool _touchGoesToHost;
     // Swapped from the settings-watcher thread while the hook thread reads it, so the field has
     // to be volatile even though the reference assignment itself is atomic.
     private volatile ShakeGestureDetector? _gesture;
@@ -87,6 +88,12 @@ public sealed class InputCapture : IDisposable
     /// the current target, so callers may prefer Ctrl+Alt+CapsLock alone.
     /// </summary>
     public void SetChordSwitch(bool enabled) => _chordSwitchEnabled = enabled;
+
+    /// <summary>
+    /// When on, touches on the video are for the host, so the mouse events Windows makes from
+    /// them are dropped instead of clicking whatever is showing the video.
+    /// </summary>
+    public void SetTouchGoesToHost(bool enabled) => _touchGoesToHost = enabled;
 
     /// <summary>
     /// A low-level mouse hook delays every pointer event system-wide, so it is only installed
@@ -518,6 +525,11 @@ public sealed class InputCapture : IDisposable
 
         if (IsTouchPromoted(data.dwExtraInfo))
         {
+            // Outside the video it stays a normal tap, which is how the button bar gets its clicks.
+            if (_touchGoesToHost && !_passThrough && TouchMapper.IsInsideVideo(data.pt.x, data.pt.y,
+                    GetSystemMetrics(0), GetSystemMetrics(1), TouchMapper.DefaultVideoAspect))
+                return 1;
+
             // It moves the real cursor off centre, so the next real delta would be a huge jump.
             _recenterPending = !_passThrough;
             return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
