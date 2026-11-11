@@ -17,6 +17,8 @@ public partial class App : Application
     private RegisteredWaitHandle? _stopRegistration;
     private bool _exiting;
     private TouchOverlayWindow? _touchLayer;
+    private bool _redirectUiActive;
+    private bool _restoreWindowAfterRedirect;
 
     public new static App Current => (App)Application.Current;
 
@@ -129,25 +131,25 @@ public partial class App : Application
     {
         var peripheral = PeripheralService.Instance;
 
-        if (peripheral.IsRedirecting && _touchLayer is null && !_exiting)
+        if (peripheral.IsRedirecting && !_redirectUiActive && !_exiting)
         {
-            // The main window would otherwise sit between the see-through layer and the video.
-            var restoreWindow = MainWindow?.IsVisible == true;
+            _redirectUiActive = true;
+            // The main window would otherwise sit on top of the video, with or without the layer.
+            _restoreWindowAfterRedirect = MainWindow?.IsVisible == true;
             MainWindow?.Hide();
 
-            var layer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
+            if (!AppSettings.Instance.TouchLayerEnabled) return;
+
+            _touchLayer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
                 () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch);
-            layer.Closed += (_, _) =>
-            {
-                _touchLayer = null;
-                if (restoreWindow && !_exiting) ShowMainWindow();
-            };
-            _touchLayer = layer;
-            layer.Show();
+            _touchLayer.Show();
         }
-        else if (!peripheral.IsRedirecting)
+        else if (!peripheral.IsRedirecting && _redirectUiActive)
         {
+            _redirectUiActive = false;
             _touchLayer?.Close();
+            _touchLayer = null;
+            if (_restoreWindowAfterRedirect && !_exiting) ShowMainWindow();
         }
     }
 

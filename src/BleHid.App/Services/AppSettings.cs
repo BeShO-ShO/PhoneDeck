@@ -38,6 +38,15 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _enableCtrlDCSwitch, value)) Save(); }
     }
 
+    private bool _touchLayerEnabled = true;
+
+    /// <summary>Whether capture also opens the see-through touch layer over the video.</summary>
+    public bool TouchLayerEnabled
+    {
+        get => _touchLayerEnabled;
+        set { if (Set(ref _touchLayerEnabled, value)) Save(); }
+    }
+
     private string? _lastHostId;
 
     /// <summary>The host last chosen as the target, reselected when it reconnects after a restart.</summary>

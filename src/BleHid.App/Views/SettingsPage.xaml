@@ -76,6 +76,18 @@
       <ui:ToggleSwitch IsChecked="{Binding EnableCtrlDCSwitch, Mode=TwoWay}" />
     </ui:CardControl>
 
+    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Touch layer during capture" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Sends touches on the video to the phone. When off, only the keyboard and mouse are captured. Press Ctrl+Alt+Q to stop capture. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Mode=TwoWay}" />
+    </ui:CardControl>
+
     <ui:CardControl Icon="{ui:SymbolIcon ArrowExit20}">
       <ui:CardControl.Header>
         <StackPanel>
