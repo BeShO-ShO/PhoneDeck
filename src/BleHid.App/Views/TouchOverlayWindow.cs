@@ -58,11 +58,11 @@ public sealed class TouchOverlayWindow : Window
             Margin = new Thickness(0, 0, 0, 16),
             Children =
             {
-                // Left to right as on a Samsung navigation bar: Recents, Home, Back.
+                // Split screen, then Samsung's navigation bar order: Recents, Home, Back.
+                MakeNavigationButton("Split screen", SplitIcon, PhoneNavigation.SplitScreen),
                 MakeNavigationButton("Recents", RecentsIcon, PhoneNavigation.Recents),
                 MakeNavigationButton("Home", HomeIcon, PhoneNavigation.Home),
-                MakeNavigationButton("Back", BackIcon, PhoneNavigation.Back),
-                MakeNavigationButton("Split screen", SplitIcon, PhoneNavigation.SplitScreen)
+                MakeNavigationButton("Back", BackIcon, PhoneNavigation.Back)
             }
         };
 
