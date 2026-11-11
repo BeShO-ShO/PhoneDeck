@@ -19,6 +19,9 @@ public partial class HomePage : Page
         if (((FrameworkElement)sender).DataContext is TargetOption option) _service.Select(option);
     }
 
+    private void OnDetails(object sender, RoutedEventArgs e) =>
+        (Window.GetWindow(this) as MainWindow)?.ShowDetails();
+
     private async void OnToggleCapture(object sender, RoutedEventArgs e)
     {
         if (_service.IsCapturing) await _service.StopCaptureAsync();

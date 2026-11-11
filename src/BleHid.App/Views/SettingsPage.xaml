@@ -5,9 +5,7 @@
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
       Title="Settings">
 
-  <StackPanel Margin="24,0,24,24">
-
-    <ui:TextBlock Text="Settings" FontTypography="TitleLarge" Margin="0,0,0,4" />
+  <StackPanel Margin="16,4,16,16">
     <ui:TextBlock Text="Control how BLE HID starts and what happens when the window is closed."
                   FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                   TextWrapping="Wrap" Margin="0,0,0,20" />

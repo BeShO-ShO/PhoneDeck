@@ -14,9 +14,8 @@
 
   <!-- No page-level ScrollViewer: NavigationView already hosts pages inside one, and a nested
        scroller swallows the wheel without being able to scroll. -->
-  <StackPanel Margin="24,0,24,24">
+  <StackPanel Margin="16,4,16,16">
 
-      <ui:TextBlock Text="Details" FontTypography="TitleLarge" Margin="0,0,0,4" />
       <ui:TextBlock Text="The Bluetooth service, connection details, pointer pacing, shortcuts, and logs."
                     FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                     TextWrapping="Wrap" Margin="0,0,0,20" />

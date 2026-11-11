@@ -15,9 +15,7 @@
 
   <!-- Everything needed every time, top to bottom: is the phone there, start, where input goes,
        touch. Logs, encryption and pacing live on the Details page. -->
-  <StackPanel Margin="24,0,24,24">
-
-    <ui:TextBlock Text="Home" FontTypography="TitleLarge" Margin="0,0,0,16" />
+  <StackPanel Margin="16,4,16,16">
 
     <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,12"
                 Title="Bluetooth is off"
@@ -41,7 +39,7 @@
         </Border>
 
         <StackPanel Grid.Column="1" Margin="14,0,12,0" VerticalAlignment="Center">
-          <ui:TextBlock Text="{Binding Headline}" FontTypography="Subtitle" TextTrimming="CharacterEllipsis" />
+          <ui:TextBlock Text="{Binding Headline}" FontTypography="Subtitle" TextWrapping="Wrap" />
           <ui:TextBlock Text="{Binding Detail}" FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </StackPanel>
@@ -111,6 +109,16 @@
       </ui:CardControl.Header>
       <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
     </ui:CardControl>
+
+    <ui:Button Appearance="Transparent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+               Margin="0,12,0,0" Padding="12,10" Click="OnDetails">
+      <Grid>
+        <TextBlock Text="Details and logs" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Path HorizontalAlignment="Right" VerticalAlignment="Center" Data="M2,2 L8,8 L2,14"
+              Stroke="{DynamicResource TextFillColorSecondaryBrush}" StrokeThickness="1.6"
+              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+      </Grid>
+    </ui:Button>
 
   </StackPanel>
 </Page>
