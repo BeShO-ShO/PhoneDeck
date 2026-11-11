@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using BleHid.Core;
 
 namespace BleHid.App.Services;
 
@@ -21,6 +22,7 @@ public sealed class RawTouchReader : IDisposable
     private const ushort TouchScreenUsage = 0x04;
     private const ushort TipSwitchUsage = 0x42;
     private const ushort ContactIdUsage = 0x51;
+    private const ushort ContactCountUsage = 0x54;
     private const ushort GenericDesktopPage = 0x01;
     private const ushort XUsage = 0x30;
     private const ushort YUsage = 0x31;
@@ -36,6 +38,7 @@ public sealed class RawTouchReader : IDisposable
     private readonly Action<string> _log;
     private readonly Dictionary<IntPtr, Device?> _devices = [];
     private readonly HwndSource _window;
+    private readonly TouchFrameAssembler _frames = new();
     private int _loggedReports;
 
     /// <param name="contact">Contact id, whether it is touching, and X and Y as 0-1 screen fractions.</param>
@@ -110,6 +113,7 @@ public sealed class RawTouchReader : IDisposable
     private void ReadReport(Device device, byte[] report)
     {
         var length = (uint)report.Length;
+        var slots = new List<RawContact>(device.Fingers.Count);
 
         foreach (var finger in device.Fingers)
         {
@@ -127,11 +131,16 @@ public sealed class RawTouchReader : IDisposable
             var id = HidP_GetUsageValue(HidpInput, DigitizerPage, finger.Link, ContactIdUsage, out var contactId,
                 device.Prepared, report, length) == HidpSuccess ? (int)contactId : finger.Link;
 
-            var fractionX = Fraction(x, finger.X);
-            var fractionY = Fraction(y, finger.Y);
-            if (_loggedReports++ < 6) _log($"raw contact {id} touching={touching} at {fractionX:F3},{fractionY:F3}");
-            _contact(id, touching, fractionX, fractionY);
+            slots.Add(new RawContact(id, touching, Fraction(x, finger.X), Fraction(y, finger.Y)));
         }
+
+        // Link 0 searches every collection: the count sits outside the per-finger ones.
+        int? contactCount = HidP_GetUsageValue(HidpInput, DigitizerPage, 0, ContactCountUsage, out var count,
+            device.Prepared, report, length) == HidpSuccess ? (int)count : null;
+        if (_loggedReports++ < 6) _log($"raw report: count {contactCount?.ToString() ?? "none"}, {slots.Count} slot(s)");
+
+        foreach (var contact in _frames.Add(contactCount, slots))
+            _contact(contact.Id, contact.Touching, contact.X, contact.Y);
     }
 
     private static double Fraction(uint value, Axis axis) =>
@@ -190,6 +199,7 @@ public sealed class RawTouchReader : IDisposable
 
         var fingers = xAxes.Where(pair => yAxes.ContainsKey(pair.Key))
             .Select(pair => new Finger(pair.Key, pair.Value, yAxes[pair.Key]))
+            .OrderBy(finger => finger.Link) // Report order: the contact count applies to the first slots.
             .ToList();
         return new Device(prepared, fingers);
     }
