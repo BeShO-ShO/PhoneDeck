@@ -25,6 +25,10 @@ public partial class StatusPage : Page
         if (e.Action == NotifyCollectionChangedAction.Add) LogScroller.ScrollToEnd();
     }
 
+    // Dragging past the end of the log otherwise makes Windows bounce the whole window.
+    private void OnBoundaryFeedback(object? sender, System.Windows.Input.ManipulationBoundaryFeedbackEventArgs e) =>
+        e.Handled = true;
+
     private async void OnStart(object sender, System.Windows.RoutedEventArgs e) =>
         await _service.StartAsync();
 

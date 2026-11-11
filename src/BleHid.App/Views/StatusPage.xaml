@@ -139,7 +139,9 @@
       <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
               BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
               BorderThickness="1" CornerRadius="8" Height="220">
-        <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Padding="12">
+        <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Padding="12"
+                      PanningMode="VerticalOnly"
+                      ManipulationBoundaryFeedback="OnBoundaryFeedback">
           <ItemsControl ItemsSource="{Binding Log}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>

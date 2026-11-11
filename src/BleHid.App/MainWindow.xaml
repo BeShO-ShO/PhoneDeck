@@ -61,7 +61,9 @@
       </ui:Button>
     </Grid>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <!-- PanningMode lets a finger drag the page; without it WPF only scrolls by wheel or bar. -->
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly"
+                  ManipulationBoundaryFeedback="OnBoundaryFeedback">
       <Frame x:Name="PageHost" NavigationUIVisibility="Hidden" Focusable="False" />
     </ScrollViewer>
   </Grid>

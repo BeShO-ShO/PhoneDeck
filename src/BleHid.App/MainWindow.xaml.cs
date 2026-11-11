@@ -41,6 +41,10 @@ public partial class MainWindow : FluentWindow
         SettingsButton.Visibility = page == _settings ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    // Dragging past the end otherwise makes Windows bounce the whole window.
+    private void OnBoundaryFeedback(object? sender, System.Windows.Input.ManipulationBoundaryFeedbackEventArgs e) =>
+        e.Handled = true;
+
     private void OnBack(object sender, RoutedEventArgs e) => ShowHome();
 
     private void OnDetails(object sender, RoutedEventArgs e) => ShowDetails();
