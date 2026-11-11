@@ -57,7 +57,9 @@ public sealed class TouchOverlayWindow : Window
             Margin = new Thickness(0, 0, 0, 16),
             Children =
             {
-                MakeNavigationButton("Back", PhoneNavigation.Back),
+                MakeNavigationButton("Back A", PhoneNavigation.BackA),
+                MakeNavigationButton("Back B", PhoneNavigation.BackB),
+                MakeNavigationButton("Back C", PhoneNavigation.BackC),
                 MakeNavigationButton("Home", PhoneNavigation.Home),
                 MakeNavigationButton("Recents", PhoneNavigation.Recents)
             }

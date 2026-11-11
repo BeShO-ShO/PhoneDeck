@@ -45,9 +45,12 @@ public sealed class TouchInputTests
     }
 
     [Fact]
-    public void Back_is_a_plain_escape_press()
+    public void Back_candidates_are_single_presses_of_different_meta_shortcuts()
     {
-        Assert.Equal([new KeyTap(KeyModifiers.None, 0x29)], PhoneNavigation.Back);
+        KeyTap[][] candidates = [PhoneNavigation.BackA, PhoneNavigation.BackB, PhoneNavigation.BackC];
+
+        Assert.All(candidates, taps => Assert.Equal(KeyModifiers.LeftGui, Assert.Single(taps).Modifiers));
+        Assert.Equal(3, candidates.Select(taps => taps[0].Usage).Distinct().Count());
     }
 
     [Fact]
