@@ -61,9 +61,8 @@ public sealed class TouchOverlayWindow : Window
                 // Left to right as on a Samsung navigation bar: Recents, Home, Back.
                 MakeNavigationButton("Recents", RecentsIcon, PhoneNavigation.Recents),
                 MakeNavigationButton("Home", HomeIcon, PhoneNavigation.Home),
-                MakeNavigationButton("Back A", BackIcon, PhoneNavigation.BackA, "A"),
-                MakeNavigationButton("Back B", BackIcon, PhoneNavigation.BackB, "B"),
-                MakeNavigationButton("Back C", BackIcon, PhoneNavigation.BackC, "C")
+                MakeNavigationButton("Back", BackIcon, PhoneNavigation.Back),
+                MakeNavigationButton("Split screen", SplitIcon, PhoneNavigation.SplitScreen)
             }
         };
 
@@ -82,6 +81,7 @@ public sealed class TouchOverlayWindow : Window
     private static readonly Geometry RecentsIcon = Geometry.Parse("M5,4 V20 M12,4 V20 M19,4 V20");
     private static readonly Geometry HomeIcon = new RectangleGeometry(new Rect(3, 3, 18, 18), 5, 5);
     private static readonly Geometry BackIcon = Geometry.Parse("M15,3 L6,12 L15,21");
+    private static readonly Geometry SplitIcon = Geometry.Parse("M3,4 H21 V20 H3 Z M12,4 V20");
 
     // A flat template: the theme's button is opaque and sized for text, not a bar over video.
     private static ControlTemplate FlatTemplate()
@@ -99,42 +99,21 @@ public sealed class TouchOverlayWindow : Window
         return new ControlTemplate(typeof(Button)) { VisualTree = border };
     }
 
-    private static UIElement MakeIcon(Geometry icon, string? badge)
+    private static UIElement MakeIcon(Geometry icon) => new System.Windows.Shapes.Path
     {
-        var path = new System.Windows.Shapes.Path
-        {
-            Data = icon,
-            Width = 24,
-            Height = 24,
-            Stroke = Brushes.White,
-            StrokeThickness = 2.4,
-            StrokeStartLineCap = PenLineCap.Round,
-            StrokeEndLineCap = PenLineCap.Round,
-            StrokeLineJoin = PenLineJoin.Round
-        };
-        if (badge is null) return path;
+        Data = icon,
+        Width = 24,
+        Height = 24,
+        Stroke = Brushes.White,
+        StrokeThickness = 2.4,
+        StrokeStartLineCap = PenLineCap.Round,
+        StrokeEndLineCap = PenLineCap.Round,
+        StrokeLineJoin = PenLineJoin.Round
+    };
 
-        return new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Children =
-            {
-                path,
-                new TextBlock
-                {
-                    Text = badge,
-                    Foreground = Brushes.White,
-                    FontSize = 14,
-                    Margin = new Thickness(4, 0, 0, 0),
-                    VerticalAlignment = VerticalAlignment.Center
-                }
-            }
-        };
-    }
-
-    private Button MakeNavigationButton(string name, Geometry icon, KeyTap[] taps, string? badge = null)
+    private Button MakeNavigationButton(string name, Geometry icon, KeyTap[] taps)
     {
-        var button = new Button { Content = MakeIcon(icon, badge), Template = FlatTemplate() };
+        var button = new Button { Content = MakeIcon(icon), Template = FlatTemplate() };
         AutomationProperties.SetName(button, name);
         _buttons.Add(button);
         button.Margin = new Thickness(8, 0, 8, 0);

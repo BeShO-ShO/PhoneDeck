@@ -13,13 +13,12 @@ public static class PhoneNavigation
     private const byte Tab = 0x2B;
     private const byte Backspace = 0x2A;
     private const byte LeftArrow = 0x50;
-    private const byte Grave = 0x35;
 
-    // Plain Escape did not reach Back in DeX. These are separate on purpose: unlike Home, going
-    // Back twice is not harmless, so candidates cannot be sent together.
-    public static readonly KeyTap[] BackA = [new(KeyModifiers.LeftGui, Backspace)];
-    public static readonly KeyTap[] BackB = [new(KeyModifiers.LeftGui, LeftArrow)];
-    public static readonly KeyTap[] BackC = [new(KeyModifiers.LeftGui, Grave)];
+    // Tested in DeX: plain Escape and Win+` do nothing, Win+Backspace is a normal Back.
+    public static readonly KeyTap[] Back = [new(KeyModifiers.LeftGui, Backspace)];
+
+    // Tested in DeX: moves the current app to the left and offers another app for the right.
+    public static readonly KeyTap[] SplitScreen = [new(KeyModifiers.LeftGui, LeftArrow)];
 
     // Two routes because Android versions and DeX differ on which one reaches Home. Going Home
     // twice is harmless, so both are sent.

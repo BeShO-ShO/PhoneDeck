@@ -45,12 +45,16 @@ public sealed class TouchInputTests
     }
 
     [Fact]
-    public void Back_candidates_are_single_presses_of_different_meta_shortcuts()
+    public void Back_is_a_single_win_backspace()
     {
-        KeyTap[][] candidates = [PhoneNavigation.BackA, PhoneNavigation.BackB, PhoneNavigation.BackC];
+        // Single on purpose: unlike Home, going Back twice is not harmless.
+        Assert.Equal([new KeyTap(KeyModifiers.LeftGui, 0x2A)], PhoneNavigation.Back);
+    }
 
-        Assert.All(candidates, taps => Assert.Equal(KeyModifiers.LeftGui, Assert.Single(taps).Modifiers));
-        Assert.Equal(3, candidates.Select(taps => taps[0].Usage).Distinct().Count());
+    [Fact]
+    public void Split_screen_is_a_single_win_left()
+    {
+        Assert.Equal([new KeyTap(KeyModifiers.LeftGui, 0x50)], PhoneNavigation.SplitScreen);
     }
 
     [Fact]
