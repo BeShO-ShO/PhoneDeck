@@ -29,6 +29,15 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _startPeripheralOnLaunch, value)) Save(); }
     }
 
+    private bool _enableCtrlDCSwitch;
+
+    /// <summary>Off by default: the chord can leak a keypress to the host being controlled.</summary>
+    public bool EnableCtrlDCSwitch
+    {
+        get => _enableCtrlDCSwitch;
+        set { if (Set(ref _enableCtrlDCSwitch, value)) Save(); }
+    }
+
     private string? _lastHostId;
 
     /// <summary>The host last chosen as the target, reselected when it reconnects after a restart.</summary>

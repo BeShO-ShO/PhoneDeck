@@ -26,6 +26,9 @@ public sealed class InputCapture : IDisposable
     private const int WM_RBUTTONDOWN = 0x0204, WM_RBUTTONUP = 0x0205;
     private const int WM_MBUTTONDOWN = 0x0207, WM_MBUTTONUP = 0x0208;
     private const int WM_MOUSEWHEEL = 0x020A;
+    private const uint WM_SYNC_MOUSE_HOOK = 0x8000 + 1; // WM_APP + 1
+    private const int VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_MBUTTON = 0x04;
+    private const int SM_SWAPBUTTON = 23;
 
     private readonly HashSet<byte> _pressedUsages = [];
     private readonly HashSet<int> _pressedVirtualKeys = [];
@@ -44,6 +47,7 @@ public sealed class InputCapture : IDisposable
     private bool _capsLockSwitchLatched;
     private volatile bool _passThrough;
     private volatile bool _running;
+    private volatile bool _chordSwitchEnabled = true;
     // Swapped from the settings-watcher thread while the hook thread reads it, so the field has
     // to be volatile even though the reference assignment itself is atomic.
     private volatile ShakeGestureDetector? _gesture;
@@ -74,7 +78,61 @@ public sealed class InputCapture : IDisposable
         // being performed, and local deltas need a fresh reference point either way.
         _gesture?.Reset();
         _haveLocalPoint = false;
+        RequestMouseHookSync();
     }
+
+    /// <summary>
+    /// Turns the Ctrl+D+C switch on or off. It can leak whichever of D or C is pressed first to
+    /// the current target, so callers may prefer Ctrl+Alt+CapsLock alone.
+    /// </summary>
+    public void SetChordSwitch(bool enabled) => _chordSwitchEnabled = enabled;
+
+    /// <summary>
+    /// A low-level mouse hook delays every pointer event system-wide, so it is only installed
+    /// while input is redirected or the shake gesture needs local motion.
+    /// </summary>
+    internal static bool NeedsMouseHook(bool passThrough, bool gestureEnabled) => !passThrough || gestureEnabled;
+
+    // Hooks belong to the thread that installs them, so changes are marshalled to the hook thread.
+    private void RequestMouseHookSync()
+    {
+        if (_running && _threadId != 0)
+            PostThreadMessage(_threadId, WM_SYNC_MOUSE_HOOK, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private void SyncMouseHook()
+    {
+        var needed = NeedsMouseHook(_passThrough, _gesture is not null);
+        if (needed == (_mouseHook != IntPtr.Zero)) return;
+
+        if (needed)
+        {
+            SeedLocalButtons();
+            _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc!, GetModuleHandle(null), 0);
+            return;
+        }
+
+        UnhookWindowsHookEx(_mouseHook);
+        _mouseHook = IntPtr.Zero;
+        // Button-up events are no longer visible, so nothing can be left believed held.
+        _buttons = MouseButtons.None;
+    }
+
+    /// <summary>
+    /// Buttons went unobserved while unhooked. One held now was pressed locally, so its release
+    /// has to stay local rather than being swallowed and leaving Windows with it stuck down.
+    /// </summary>
+    private void SeedLocalButtons()
+    {
+        var swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+        var held = MouseButtons.None;
+        if (IsPhysicallyDown(VK_LBUTTON)) held |= swapped ? MouseButtons.Right : MouseButtons.Left;
+        if (IsPhysicallyDown(VK_RBUTTON)) held |= swapped ? MouseButtons.Left : MouseButtons.Right;
+        if (IsPhysicallyDown(VK_MBUTTON)) held |= MouseButtons.Middle;
+        _localButtons = held;
+    }
+
+    private static bool IsPhysicallyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
     /// <summary>
     /// Enables or disables the pointer switch gesture. When enabled, shaking the pointer back
@@ -84,6 +142,7 @@ public sealed class InputCapture : IDisposable
     {
         _gesture = options is { Enabled: true } ? new ShakeGestureDetector(options) : null;
         _haveLocalPoint = false;
+        RequestMouseHookSync();
     }
 
     /// <summary>Test hook: replaces the wall clock used by the switch gesture.</summary>
@@ -157,7 +216,7 @@ public sealed class InputCapture : IDisposable
         var module = GetModuleHandle(null);
         _keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc, module, 0);
         var keyboardError = Marshal.GetLastWin32Error();
-        _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc, module, 0);
+        SyncMouseHook();
         var mouseError = Marshal.GetLastWin32Error();
 
         Log?.Invoke($"  [hook] keyboard=0x{_keyboardHook:x} (err {keyboardError}), mouse=0x{_mouseHook:x} (err {mouseError}), screen={GetSystemMetrics(0)}x{GetSystemMetrics(1)}, center={_centerX},{_centerY}");
@@ -171,6 +230,12 @@ public sealed class InputCapture : IDisposable
         int result;
         while ((result = GetMessage(out var message, IntPtr.Zero, 0, 0)) > 0)
         {
+            if (message.message == WM_SYNC_MOUSE_HOOK)
+            {
+                SyncMouseHook();
+                continue;
+            }
+
             TranslateMessage(ref message);
             DispatchMessage(ref message);
         }
@@ -261,8 +326,12 @@ public sealed class InputCapture : IDisposable
         var module = GetModuleHandle(null);
         if (_keyboardHook != IntPtr.Zero) UnhookWindowsHookEx(_keyboardHook);
         _keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc!, module, 0);
-        if (_mouseHook != IntPtr.Zero) UnhookWindowsHookEx(_mouseHook);
-        _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc!, module, 0);
+        // Only re-armed if installed: it is deliberately absent while input stays local.
+        if (_mouseHook != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_mouseHook);
+            _mouseHook = SetWindowsHookEx(WH_MOUSE_LL, _mouseProc!, module, 0);
+        }
         _rearms++;
 
         if (Verbose)
@@ -320,7 +389,8 @@ public sealed class InputCapture : IDisposable
 
         // Ctrl+D+C switches host. Latched so key auto-repeat cannot cycle past the target.
         if (!isDown && virtualKey is 0x44 or 0x43) _switchLatched = false;
-        if (isDown && IsDown(0x11) && _pressedVirtualKeys.Contains(0x44) && _pressedVirtualKeys.Contains(0x43))
+        if (_chordSwitchEnabled && isDown && IsDown(0x11) &&
+            _pressedVirtualKeys.Contains(0x44) && _pressedVirtualKeys.Contains(0x43))
         {
             if (!_switchLatched)
             {
@@ -581,6 +651,9 @@ public sealed class InputCapture : IDisposable
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetProcessDpiAwarenessContext(IntPtr value);

@@ -64,6 +64,18 @@
       <ui:ToggleSwitch x:Name="SwitchGestureToggle" Click="OnSwitchGestureChanged" />
     </ui:CardControl>
 
+    <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Also switch target with Ctrl+D+C" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Can send a stray D or C to the device you are controlling. Ctrl+Alt+CapsLock always works. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding EnableCtrlDCSwitch, Mode=TwoWay}" />
+    </ui:CardControl>
+
     <ui:CardControl Icon="{ui:SymbolIcon ArrowExit20}">
       <ui:CardControl.Header>
         <StackPanel>

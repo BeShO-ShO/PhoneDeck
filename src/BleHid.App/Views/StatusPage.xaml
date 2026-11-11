@@ -26,6 +26,18 @@
                   Message="Start the peripheral to make this PC discoverable as a Bluetooth keyboard."
                   IsOpen="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
 
+      <ui:InfoBar Severity="Informational" IsClosable="False" Margin="0,0,0,16"
+                  Title="No device connected"
+                  Message="On your phone, open Bluetooth settings, tap the gear next to this PC, and tap Connect. If it has never been paired, pair it from there first."
+                  IsOpen="{Binding NeedsReconnect}" />
+
+      <ui:CardControl Icon="{ui:SymbolIcon PlugConnected24}" Margin="0,0,0,8">
+        <ui:CardControl.Header>
+          <ui:TextBlock Text="Connection" FontTypography="BodyStrong" />
+        </ui:CardControl.Header>
+        <ui:TextBlock Text="{Binding ConnectionText}" FontTypography="Body" TextWrapping="Wrap" />
+      </ui:CardControl>
+
       <ui:CardControl Icon="{ui:SymbolIcon Bluetooth24}" Margin="0,0,0,8">
         <ui:CardControl.Header>
           <StackPanel>

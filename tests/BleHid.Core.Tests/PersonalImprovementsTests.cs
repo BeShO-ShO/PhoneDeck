@@ -58,6 +58,86 @@ public sealed class PersonalImprovementsTests
         Assert.Equal(["mouse:Left", "mouse:None", "stop"], events);
     }
 
+    [Theory]
+    [InlineData(false, false, true)]  // redirecting needs pointer deltas
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]    // local, but the shake gesture watches motion
+    [InlineData(true, false, false)]  // local with no gesture: nothing to hook for
+    public void Mouse_hook_is_only_needed_when_something_uses_it(bool passThrough, bool gesture, bool expected)
+    {
+        Assert.Equal(expected, InputCapture.NeedsMouseHook(passThrough, gesture));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Disabled_chord_does_not_switch_target(bool passThrough)
+    {
+        using var capture = new InputCapture();
+        capture.SetPassThrough(passThrough);
+        capture.SetChordSwitch(false);
+        var switches = 0;
+        capture.SwitchHostRequested += () => switches++;
+
+        capture.HandleKeyboardEvent(LeftControl, true);
+        capture.HandleKeyboardEvent(0x44, true);
+        capture.HandleKeyboardEvent(0x43, true);
+
+        Assert.Equal(0, switches);
+    }
+
+    [Fact]
+    public void Disabled_chord_leaves_the_keys_working_locally()
+    {
+        using var capture = new InputCapture();
+        capture.SetPassThrough(true);
+        capture.SetChordSwitch(false);
+
+        capture.HandleKeyboardEvent(LeftControl, true);
+        capture.HandleKeyboardEvent(0x44, true);
+
+        Assert.False(capture.HandleKeyboardEvent(0x43, true));
+    }
+
+    [Fact]
+    public void Disabled_chord_keeps_the_caps_lock_switch()
+    {
+        using var capture = new InputCapture();
+        capture.SetChordSwitch(false);
+        var switches = 0;
+        capture.SwitchHostRequested += () => switches++;
+
+        capture.HandleKeyboardEvent(LeftControl, true);
+        capture.HandleKeyboardEvent(LeftAlt, true);
+        capture.HandleKeyboardEvent(0x14, true);
+
+        Assert.Equal(1, switches);
+    }
+
+    [Fact]
+    public void Summary_says_not_running()
+    {
+        Assert.Equal("Not running", ConnectionSummary.Describe(false, ["phone"]));
+    }
+
+    [Fact]
+    public void Summary_says_when_nothing_is_connected()
+    {
+        Assert.Equal("No device connected", ConnectionSummary.Describe(true, []));
+    }
+
+    [Fact]
+    public void Summary_names_a_single_device()
+    {
+        Assert.Equal("Connected to phone", ConnectionSummary.Describe(true, ["phone"]));
+    }
+
+    [Fact]
+    public void Summary_counts_several_devices()
+    {
+        Assert.Equal("Connected to 2 devices", ConnectionSummary.Describe(true, ["phone", "tablet"]));
+    }
+
     [Fact]
     public async Task Shutdown_step_reports_success()
     {

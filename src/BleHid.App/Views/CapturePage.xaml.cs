@@ -15,6 +15,9 @@ public partial class CapturePage : Page
         DataContext = _service;
         _service.Hosts.CollectionChanged += OnHostsChanged;
         Unloaded += (_, _) => _service.Hosts.CollectionChanged -= OnHostsChanged;
+        // On Loaded rather than here: pages are kept, and the setting can change in between.
+        Loaded += (_, _) => ChordHint.Visibility =
+            AppSettings.Instance.EnableCtrlDCSwitch ? Visibility.Visible : Visibility.Collapsed;
         UpdateEmptyState();
     }
 

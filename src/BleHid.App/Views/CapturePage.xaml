@@ -24,8 +24,13 @@
                   IsOpen="{Binding IsRedirecting}" />
 
       <ui:InfoBar x:Name="NoHostsBar" Severity="Informational" IsClosable="False" Margin="0,0,0,16"
-                  Title="No hosts yet"
-                  Message="Pair from the device you want to control, then wait for it to subscribe. On a Windows host, pick the entry shown as an input device rather than the audio one." />
+                  Title="No device connected"
+                  Message="On your phone, open Bluetooth settings, tap the gear next to this PC, and tap Connect. If it has never been paired, pair it from there first. On a Windows host, pick the entry shown as an input device rather than the audio one." />
+
+      <ui:InfoBar Severity="Informational" IsClosable="False" Margin="0,0,0,16"
+                  Title="Input is staying on this PC"
+                  Message="Capture is on, but This PC is selected. Choose a device under Send input to."
+                  IsOpen="{Binding IsCapturingLocally}" />
 
       <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,16">
         <ui:CardControl.Header>
@@ -97,7 +102,7 @@
         <StackPanel MaxWidth="240">
           <ui:TextBlock Text="Ctrl + Alt + CapsLock" FontFamily="Cascadia Mono, Consolas"
                         FontTypography="Body" TextWrapping="Wrap" />
-          <ui:TextBlock Text="or Ctrl + D + C" FontFamily="Cascadia Mono, Consolas"
+          <ui:TextBlock x:Name="ChordHint" Text="or Ctrl + D + C" FontFamily="Cascadia Mono, Consolas"
                         FontTypography="Body" TextWrapping="Wrap" Margin="0,4,0,0"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </StackPanel>

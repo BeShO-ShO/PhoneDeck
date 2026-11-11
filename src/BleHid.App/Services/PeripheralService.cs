@@ -60,6 +60,15 @@ public sealed class PeripheralService : INotifyPropertyChanged
     /// </summary>
     public bool IsRedirecting => IsCapturing && !_inputLocal;
 
+    /// <summary>Capture is on but nothing is leaving this PC, which looks like capture being broken.</summary>
+    public bool IsCapturingLocally => IsCapturing && _inputLocal;
+
+    /// <summary>Running with nothing live: after a restart the phone has to be told to reconnect.</summary>
+    public bool NeedsReconnect => IsRunning && KeyboardSubscribers == 0;
+
+    private string _connectionText = ConnectionSummary.Describe(false, []);
+    public string ConnectionText { get => _connectionText; private set => Set(ref _connectionText, value); }
+
     private bool _requireEncryption = true;
     public bool RequireEncryption
     {
@@ -156,6 +165,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
             _hostSignature = null;
             AdvertisementStatus = "Stopped";
             KeyboardSubscribers = MouseSubscribers = 0;
+            ConnectionText = ConnectionSummary.Describe(false, []);
             Target = "nothing yet";
             Append("peripheral stopped");
         }
@@ -331,7 +341,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
             try
             {
                 await CaptureSession.RunAsync(peripheral, Append, verbose: false, () => PointerIntervalMs,
-                    stopEndsSession: true, token);
+                    stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch);
             }
             catch (Exception ex)
             {
@@ -389,6 +399,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
         {
             _inputLocal = _peripheral.IsLocalTarget;
             OnPropertyChanged(nameof(IsRedirecting));
+            OnPropertyChanged(nameof(IsCapturingLocally));
         }
 
         Target = _peripheral.SelectedHostDisplay;
@@ -417,6 +428,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
         AdvertisementStatus = _peripheral.AdvertisementStatus.ToString();
         KeyboardSubscribers = _peripheral.SubscribedKeyboardClients;
         MouseSubscribers = _peripheral.SubscribedMouseClients;
+        ConnectionText = ConnectionSummary.Describe(true, _peripheral.Hosts()
+            .Select(h => h.Name is { Length: > 0 } name ? name : h.Address).ToList());
         // Ctrl+D+C changes the target without going through the UI, so mirror it back.
         SyncTargetState();
         LinkIntervalMs = _peripheral.MouseReportIntervalMs(PointerIntervalMs);
@@ -451,7 +464,15 @@ public sealed class PeripheralService : INotifyPropertyChanged
         if (EqualityComparer<T>.Default.Equals(field, value)) return;
         field = value;
         OnPropertyChanged(name);
-        if (name is nameof(IsRunning) or nameof(KeyboardSubscribers)) OnPropertyChanged(nameof(CanCapture));
-        if (name is nameof(IsCapturing)) OnPropertyChanged(nameof(IsRedirecting));
+        if (name is nameof(IsRunning) or nameof(KeyboardSubscribers))
+        {
+            OnPropertyChanged(nameof(CanCapture));
+            OnPropertyChanged(nameof(NeedsReconnect));
+        }
+        if (name is nameof(IsCapturing))
+        {
+            OnPropertyChanged(nameof(IsRedirecting));
+            OnPropertyChanged(nameof(IsCapturingLocally));
+        }
     }
 }

@@ -109,15 +109,18 @@ public static class CaptureSession
     /// Console mode ends on Ctrl+Alt+Q. Background mode has no console to return to, so the
     /// same hotkey drops to the local target instead and capture keeps running.
     /// </param>
+    /// <param name="chordSwitch">Whether Ctrl+D+C switches target as well as Ctrl+Alt+CapsLock.</param>
     public static async Task<int> RunAsync(
         BleHidPeripheral peripheral,
         Action<string> log,
         bool verbose,
         Func<int> mouseIntervalMs,
         bool stopEndsSession,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool chordSwitch = true)
     {
         using var capture = new InputCapture { Verbose = verbose };
+        capture.SetChordSwitch(chordSwitch);
         var stopped = new TaskCompletionSource();
         using var registration = cancellationToken.Register(() => stopped.TrySetResult());
 
@@ -290,7 +293,9 @@ public static class CaptureSession
 
             log($"  pointer report interval: {PointerIntervalMs()} ms");
             log($"  sending to: {peripheral.SelectedHostDisplay}");
-            log("  Ctrl+Alt+CapsLock or Ctrl+D+C switches target.");
+            log(chordSwitch
+                ? "  Ctrl+Alt+CapsLock or Ctrl+D+C switches target."
+                : "  Ctrl+Alt+CapsLock switches target.");
             log(stopEndsSession
                 ? "  capturing - Ctrl+Alt+Q stops."
                 : "  capturing - Ctrl+Alt+Q returns input to this PC.");

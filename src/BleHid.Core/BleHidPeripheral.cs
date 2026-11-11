@@ -26,6 +26,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     private readonly ConcurrentDictionary<string, string> _hostNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BluetoothLEDevice> _hostDevices = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _connectionIntervalsMs = new(StringComparer.OrdinalIgnoreCase);
+    // Absent means not yet confirmed, which is treated the same as unpaired.
+    private readonly ConcurrentDictionary<string, bool> _pairedHosts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _warnedUnpaired = new(StringComparer.OrdinalIgnoreCase);
     // Caps Lock is lock state owned by the host: we send the keycode, the host decides what it
     // means, and HID gives it no way to tell us the result unless it reports its lamps.
     private readonly HostLockState _lockState = new();
@@ -70,8 +73,15 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         !_hostDevices.TryGetValue(deviceId, out var device) ||
         device.ConnectionStatus == BluetoothConnectionStatus.Connected;
 
+    // The GATT layer does not stop an unbonded device subscribing to notifications, so input is
+    // only ever sent to hosts Windows confirms are paired. Plain mode opts out of that on purpose.
+    private bool IsAllowedHost(string deviceId) =>
+        _protection == GattProtectionLevel.Plain || _pairedHosts.GetValueOrDefault(deviceId);
+
+    private bool IsUsableHost(string deviceId) => IsLiveHost(deviceId) && IsAllowedHost(deviceId);
+
     private int CountLiveClients(GattLocalCharacteristic? characteristic) =>
-        characteristic?.SubscribedClients.Count(client => IsLiveHost(client.Session.DeviceId.Id)) ?? 0;
+        characteristic?.SubscribedClients.Count(client => IsUsableHost(client.Session.DeviceId.Id)) ?? 0;
 
     public int MouseReportIntervalMs(int configuredIntervalMs)
     {
@@ -427,21 +437,24 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         await _connectionParameterGate.WaitAsync();
         try
         {
-            foreach (var host in Hosts())
+            // Every subscriber rather than Hosts(): Hosts() only lists devices this loop has vetted.
+            foreach (var deviceId in SubscribedHostIds())
             {
-                if (!_hostDevices.TryGetValue(host.DeviceId, out var device))
+                if (!_hostDevices.TryGetValue(deviceId, out var device))
                 {
-                    device = await BluetoothLEDevice.FromIdAsync(host.DeviceId);
+                    device = await BluetoothLEDevice.FromIdAsync(deviceId);
                     if (device is null) continue;
                     if (!string.IsNullOrWhiteSpace(device.Name))
-                        _hostNames[host.DeviceId] = device.Name;
+                        _hostNames[deviceId] = device.Name;
                     device.ConnectionStatusChanged += OnConnectionStatusChanged;
                     if (CanReadConnectionParameters)
                         device.ConnectionParametersChanged += OnConnectionParametersChanged;
-                    _hostDevices[host.DeviceId] = device;
+                    _hostDevices[deviceId] = device;
                 }
 
-                if (CanReadConnectionParameters)
+                if (!_pairedHosts.GetValueOrDefault(deviceId)) await RefreshPairingAsync(deviceId);
+
+                if (CanReadConnectionParameters && device.ConnectionStatus == BluetoothConnectionStatus.Connected)
                     UpdateConnectionInterval(device);
             }
         }
@@ -455,10 +468,32 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Asks for the device directly: a pairing-state device query returns entries whose
+    /// Pairing.IsPaired reads false even for bonded devices.
+    /// </summary>
+    private async Task RefreshPairingAsync(string deviceId)
+    {
+        using var device = await BluetoothLEDevice.FromIdAsync(deviceId);
+        var paired = device?.DeviceInformation.Pairing.IsPaired == true;
+        _pairedHosts[deviceId] = paired;
+
+        if (paired || _protection == GattProtectionLevel.Plain) return;
+        if (_warnedUnpaired.TryAdd(deviceId, 0))
+            Log?.Invoke($"[sec ] ignoring {ShortAddress(deviceId)}: subscribed but not paired with this PC");
+    }
+
     private void OnConnectionStatusChanged(BluetoothLEDevice sender, object args)
     {
         Log?.Invoke($"[link] connection status -> {sender.ConnectionStatus}");
-        if (sender.ConnectionStatus != BluetoothConnectionStatus.Disconnected) return;
+        if (sender.ConnectionStatus != BluetoothConnectionStatus.Disconnected)
+        {
+            _ = RefreshConnectionParametersAsync();
+            return;
+        }
+
+        // A bond can be removed while the link is down, so a reconnect has to prove it again.
+        _pairedHosts.TryRemove(sender.DeviceId, out _);
 
         // The host owns its lock state and can change it while we are not attached, so a
         // reconnect starts from the default rather than carrying a stale belief forward.
@@ -630,12 +665,18 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     /// <summary>Subscribed hosts, de-duplicated across the keyboard and mouse reports.</summary>
     public IReadOnlyList<HostTarget> Hosts()
     {
+        var ids = SubscribedHostIds();
+        ids.RemoveWhere(id => !IsUsableHost(id));
+
+        return ids.Select(id => new HostTarget(id, ShortAddress(id), _hostNames.GetValueOrDefault(id))).ToList();
+    }
+
+    private SortedSet<string> SubscribedHostIds()
+    {
         var ids = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var client in _keyboardInput?.SubscribedClients ?? []) ids.Add(client.Session.DeviceId.Id);
         foreach (var client in _mouseInput?.SubscribedClients ?? []) ids.Add(client.Session.DeviceId.Id);
-        ids.RemoveWhere(id => !IsLiveHost(id));
-
-        return ids.Select(id => new HostTarget(id, ShortAddress(id), _hostNames.GetValueOrDefault(id))).ToList();
+        return ids;
     }
 
     private void ReturnLocalIfTargetUnavailable()
@@ -716,6 +757,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     /// <summary>Resolves friendly names for subscribed hosts so they can be shown while switching.</summary>
     public async Task RefreshHostNamesAsync()
     {
+        // Also the periodic check: a bonded host's stale subscription raises no event of its own.
+        await RefreshConnectionParametersAsync();
+
         foreach (var host in Hosts())
         {
             if (_hostNames.ContainsKey(host.DeviceId)) continue;
@@ -746,13 +790,16 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         var target = _selectedHostId;
         if (target is null)
         {
-            await characteristic.NotifyValueAsync(buffer);
+            foreach (var client in characteristic.SubscribedClients)
+                if (IsUsableHost(client.Session.DeviceId.Id))
+                    await characteristic.NotifyValueAsync(buffer, client);
             return;
         }
 
         foreach (var client in characteristic.SubscribedClients)
         {
             if (!string.Equals(client.Session.DeviceId.Id, target, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!IsAllowedHost(target)) break;
             await characteristic.NotifyValueAsync(buffer, client);
             return;
         }
