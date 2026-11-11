@@ -142,9 +142,10 @@ public partial class App : Application
 
             if (!AppSettings.Instance.TouchLayerEnabled) return;
 
-            // The bar's X quits outright: capture stops, keys are released, and the phone disconnects.
+            // The bar's X matches Ctrl+Alt+Q: capture stops but BleHid keeps running, so the same
+            // keys turn it straight back on.
             _touchLayer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
-                ExitApplication, peripheral.LogTouch);
+                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch);
             _touchLayer.Show();
         }
         else if (!peripheral.IsRedirecting && _redirectUiActive)
