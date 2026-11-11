@@ -111,9 +111,6 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
     public bool HasTargetLockWarning => TargetLockWarning is not null;
 
-    /// <summary>The touch layer talks to the selected host directly, so it cannot share with capture.</summary>
-    public bool CanUseTouch => IsRunning && !_inputLocal && !IsCapturing && KeyboardSubscribers > 0;
-
     public Task SendTouchAsync(bool down, int x, int y) =>
         _peripheral?.SendTouchAsync(down, x, y) ?? Task.CompletedTask;
 

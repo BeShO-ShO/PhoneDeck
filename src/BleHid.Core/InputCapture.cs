@@ -45,6 +45,7 @@ public sealed class InputCapture : IDisposable
     private int _keyboardEvents, _mouseEvents, _rearms;
     private bool _switchLatched;
     private bool _capsLockSwitchLatched;
+    private bool _recenterPending;
     private volatile bool _passThrough;
     private volatile bool _running;
     private volatile bool _chordSwitchEnabled = true;
@@ -92,6 +93,12 @@ public sealed class InputCapture : IDisposable
     /// while input is redirected or the shake gesture needs local motion.
     /// </summary>
     internal static bool NeedsMouseHook(bool passThrough, bool gestureEnabled) => !passThrough || gestureEnabled;
+
+    /// <summary>
+    /// Windows also reports touch and pen as mouse events, tagged with this signature. Those
+    /// belong to the touch layer; forwarding them would fling the phone's pointer around.
+    /// </summary>
+    internal static bool IsTouchPromoted(IntPtr extraInfo) => ((long)extraInfo & 0xFFFFFF00L) == 0xFF515700L;
 
     // Hooks belong to the thread that installs them, so changes are marshalled to the hook thread.
     private void RequestMouseHookSync()
@@ -509,6 +516,13 @@ public sealed class InputCapture : IDisposable
         if ((data.flags & LLMHF_INJECTED) != 0)
             return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
 
+        if (IsTouchPromoted(data.dwExtraInfo))
+        {
+            // It moves the real cursor off centre, so the next real delta would be a huge jump.
+            _recenterPending = !_passThrough;
+            return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
+        }
+
         var message = (int)wParam;
         var button = message switch
         {
@@ -534,6 +548,13 @@ public sealed class InputCapture : IDisposable
         }
 
         _mouseEvents++;
+
+        if (_recenterPending && (int)wParam == WM_MOUSEMOVE)
+        {
+            _recenterPending = false;
+            SetCursorPos(_centerX, _centerY);
+            return 1;
+        }
 
         switch ((int)wParam)
         {

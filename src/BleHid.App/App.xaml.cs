@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using BleHid.App.Services;
+using BleHid.App.Views;
 using BleHid.Core;
 using Wpf.Ui.Appearance;
 
@@ -15,6 +16,7 @@ public partial class App : Application
     private EventWaitHandle? _stopRequest;
     private RegisteredWaitHandle? _stopRegistration;
     private bool _exiting;
+    private TouchOverlayWindow? _touchLayer;
 
     public new static App Current => (App)Application.Current;
 
@@ -51,6 +53,12 @@ public partial class App : Application
         var peripheral = PeripheralService.Instance;
         peripheral.PropertyChanged += (_, args) =>
         {
+            if (args.PropertyName == nameof(peripheral.IsRedirecting))
+            {
+                Dispatcher.InvokeAsync(SyncTouchLayer);
+                return;
+            }
+
             if (args.PropertyName is not (nameof(peripheral.Target) or nameof(peripheral.TargetLockWarning))) return;
             Dispatcher.Invoke(() => Tray?.UpdateStatus(peripheral.Target, peripheral.TargetLockWarning));
         };
@@ -111,6 +119,36 @@ public partial class App : Application
                 "BLE HID", MessageBoxButton.OK, MessageBoxImage.Warning);
 
         return owned;
+    }
+
+    /// <summary>
+    /// Touch follows the keyboard and mouse: the layer is up exactly while input is going to the
+    /// phone, however that started or ended, including the phone dropping out.
+    /// </summary>
+    private void SyncTouchLayer()
+    {
+        var peripheral = PeripheralService.Instance;
+
+        if (peripheral.IsRedirecting && _touchLayer is null && !_exiting)
+        {
+            // The main window would otherwise sit between the see-through layer and the video.
+            var restoreWindow = MainWindow?.IsVisible == true;
+            MainWindow?.Hide();
+
+            var layer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
+                () => _ = peripheral.StopCaptureAsync());
+            layer.Closed += (_, _) =>
+            {
+                _touchLayer = null;
+                if (restoreWindow && !_exiting) ShowMainWindow();
+            };
+            _touchLayer = layer;
+            layer.Show();
+        }
+        else if (!peripheral.IsRedirecting)
+        {
+            _touchLayer?.Close();
+        }
     }
 
     public void ShowMainWindow()

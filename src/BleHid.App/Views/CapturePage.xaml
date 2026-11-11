@@ -47,18 +47,6 @@
                          Click="OnToggleCapture" />
       </ui:CardControl>
 
-      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,16">
-        <ui:CardControl.Header>
-          <StackPanel>
-            <ui:TextBlock Text="Touch layer (experiment)" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Put the video full screen first. Select your phone below and leave capture off. Press Esc to leave." />
-          </StackPanel>
-        </ui:CardControl.Header>
-        <ui:Button Content="Open" Click="OnOpenTouchLayer" />
-      </ui:CardControl>
-
       <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,16"
                   Title="Lock keys on the target host"
                   Message="{Binding TargetLockWarning, Mode=OneWay}"

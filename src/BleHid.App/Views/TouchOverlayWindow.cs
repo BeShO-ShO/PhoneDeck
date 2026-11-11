@@ -3,13 +3,14 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using BleHid.Core;
 
 namespace BleHid.App.Views;
 
 /// <summary>
-/// Experiment: a see-through full-screen layer over a full-screen video of the phone. One finger
-/// on the video becomes one touch at the same point on the phone.
+/// A see-through full-screen layer over a full-screen video of the phone, shown while input is
+/// going to the phone. Fingers on the video become touches at the same point on the phone.
 /// </summary>
 public sealed class TouchOverlayWindow : Window
 {
@@ -19,15 +20,21 @@ public sealed class TouchOverlayWindow : Window
     private enum Kind { Down, Move, Up }
     private readonly record struct TouchEvent(Kind Kind, int X, int Y);
 
+    private static readonly Geometry RecentsIcon = Geometry.Parse("M5,4 V20 M12,4 V20 M19,4 V20");
+    private static readonly Geometry HomeIcon = new RectangleGeometry(new Rect(3, 3, 18, 18), 5, 5);
+    private static readonly Geometry BackIcon = Geometry.Parse("M15,3 L6,12 L15,21");
+    private static readonly Geometry SplitIcon = Geometry.Parse("M3,4 H21 V20 H3 Z M12,4 V20");
+
     private readonly Func<bool, int, int, Task> _send;
-    private readonly List<TouchEvent> _queue = [];
     private readonly Func<IReadOnlyList<KeyTap>, Task> _sendKeys;
+    private readonly TouchGestureRecognizer _gestures = new();
+    private readonly DispatcherTimer _timer;
     private readonly List<Button> _buttons = [];
-    private TouchDevice? _contact;
-    private (int X, int Y) _lastPoint;
+    private readonly List<TouchEvent> _queue = [];
     private bool _pumping;
 
-    public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys)
+    public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys,
+        Action stopCapture)
     {
         _send = send;
         _sendKeys = sendKeys;
@@ -39,15 +46,19 @@ public sealed class TouchOverlayWindow : Window
         Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
         Topmost = true;
         ShowInTaskbar = false;
+        ShowActivated = false;
         WindowState = WindowState.Maximized;
+        // Capture parks the real cursor mid-screen, where it would otherwise sit on top of the video.
+        Cursor = Cursors.None;
         Stylus.SetIsPressAndHoldEnabled(this, false);
         Stylus.SetIsFlicksEnabled(this, false);
 
-        var exitButton = MakeButton("Exit touch (Esc)");
-        exitButton.Margin = new Thickness(8);
-        exitButton.HorizontalAlignment = HorizontalAlignment.Right;
-        exitButton.VerticalAlignment = VerticalAlignment.Top;
-        exitButton.Click += (_, _) => Close();
+        var stopButton = new Button { Content = "Stop capture", Padding = new Thickness(16, 10, 16, 10) };
+        _buttons.Add(stopButton);
+        stopButton.Margin = new Thickness(8);
+        stopButton.HorizontalAlignment = HorizontalAlignment.Right;
+        stopButton.VerticalAlignment = VerticalAlignment.Top;
+        stopButton.Click += (_, _) => stopCapture();
 
         // Bottom centre sits in the black bar when a 16:9 video is letterboxed on a 3:2 screen.
         var navigation = new StackPanel
@@ -66,22 +77,12 @@ public sealed class TouchOverlayWindow : Window
             }
         };
 
-        Content = new Grid { Children = { exitButton, navigation } };
+        Content = new Grid { Children = { stopButton, navigation } };
 
-        Loaded += (_, _) => Activate();
+        _timer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(15) };
+        _timer.Tick += (_, _) => Apply(_gestures.Tick(Environment.TickCount64));
+        _timer.Start();
     }
-
-    private Button MakeButton(string text)
-    {
-        var button = new Button { Content = text, Padding = new Thickness(24, 12, 24, 12) };
-        _buttons.Add(button);
-        return button;
-    }
-
-    private static readonly Geometry RecentsIcon = Geometry.Parse("M5,4 V20 M12,4 V20 M19,4 V20");
-    private static readonly Geometry HomeIcon = new RectangleGeometry(new Rect(3, 3, 18, 18), 5, 5);
-    private static readonly Geometry BackIcon = Geometry.Parse("M15,3 L6,12 L15,21");
-    private static readonly Geometry SplitIcon = Geometry.Parse("M3,4 H21 V20 H3 Z M12,4 V20");
 
     // A flat template: the theme's button is opaque and sized for text, not a bar over video.
     private static ControlTemplate FlatTemplate()
@@ -117,22 +118,12 @@ public sealed class TouchOverlayWindow : Window
         AutomationProperties.SetName(button, name);
         _buttons.Add(button);
         button.Margin = new Thickness(8, 0, 8, 0);
-        button.Click += async (_, _) =>
-        {
-            try { await _sendKeys(taps); }
-            catch (Exception) { /* A dropped link should not take the app down. */ }
-        };
+        button.Click += (_, _) => _ = SendKeysAsync(taps);
         return button;
     }
 
     private bool IsOverButton(TouchEventArgs e) =>
         _buttons.Any(button => button.InputHitTest(e.GetTouchPoint(button).Position) is not null);
-
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape) Close();
-        base.OnKeyDown(e);
-    }
 
     protected override void OnTouchDown(TouchEventArgs e)
     {
@@ -141,45 +132,66 @@ public sealed class TouchOverlayWindow : Window
         if (IsOverButton(e)) return;
 
         e.Handled = true;
-        if (_contact is not null) return; // One finger only in this experiment.
-
         var point = e.GetTouchPoint(this).Position;
         if (!TouchMapper.IsInsideVideo(point.X, point.Y, ActualWidth, ActualHeight, VideoAspect)) return;
 
-        _contact = e.TouchDevice;
         CaptureTouch(e.TouchDevice);
-        Enqueue(Kind.Down, point);
+        Apply(_gestures.FingerDown(e.TouchDevice.Id, point.X, point.Y, Environment.TickCount64));
     }
 
     protected override void OnTouchMove(TouchEventArgs e)
     {
         base.OnTouchMove(e);
-        if (e.TouchDevice != _contact) return;
-        e.Handled = true;
-        Enqueue(Kind.Move, e.GetTouchPoint(this).Position);
+        var point = e.GetTouchPoint(this).Position;
+        Apply(_gestures.FingerMove(e.TouchDevice.Id, point.X, point.Y, Environment.TickCount64));
     }
 
     protected override void OnTouchUp(TouchEventArgs e)
     {
         base.OnTouchUp(e);
-        if (e.TouchDevice != _contact) return;
-        e.Handled = true;
-        Enqueue(Kind.Up, e.GetTouchPoint(this).Position);
+        var point = e.GetTouchPoint(this).Position;
+        Apply(_gestures.FingerUp(e.TouchDevice.Id, point.X, point.Y, Environment.TickCount64));
         ReleaseTouchCapture(e.TouchDevice);
-        _contact = null;
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        _timer.Stop();
         // A contact left down would stay pressed on the phone.
-        if (_contact is not null) _ = _send(false, _lastPoint.X, _lastPoint.Y);
+        foreach (var output in _gestures.Cancel())
+        {
+            var (x, y) = TouchMapper.Map(output.X, output.Y, ActualWidth, ActualHeight, VideoAspect);
+            _ = _send(false, x, y);
+        }
         base.OnClosed(e);
     }
 
-    private void Enqueue(Kind kind, Point point)
+    private void Apply(List<TouchOutput> outputs)
     {
-        _lastPoint = TouchMapper.Map(point.X, point.Y, ActualWidth, ActualHeight, VideoAspect);
-        var touch = new TouchEvent(kind, _lastPoint.X, _lastPoint.Y);
+        foreach (var output in outputs)
+        {
+            switch (output.Action)
+            {
+                case GestureAction.Down: Enqueue(Kind.Down, output); break;
+                case GestureAction.Move: Enqueue(Kind.Move, output); break;
+                case GestureAction.Up: Enqueue(Kind.Up, output); break;
+                case GestureAction.Back: _ = SendKeysAsync(PhoneNavigation.Back); break;
+                case GestureAction.Home: _ = SendKeysAsync(PhoneNavigation.Home); break;
+                case GestureAction.Recents: _ = SendKeysAsync(PhoneNavigation.Recents); break;
+            }
+        }
+    }
+
+    private async Task SendKeysAsync(KeyTap[] taps)
+    {
+        try { await _sendKeys(taps); }
+        catch (Exception) { /* A dropped link should not take the app down. */ }
+    }
+
+    private void Enqueue(Kind kind, TouchOutput output)
+    {
+        var (x, y) = TouchMapper.Map(output.X, output.Y, ActualWidth, ActualHeight, VideoAspect);
+        var touch = new TouchEvent(kind, x, y);
 
         // The link cannot carry every move, but a press and a release must never be merged away.
         if (kind == Kind.Move && _queue.Count > 0 && _queue[^1].Kind == Kind.Move) _queue[^1] = touch;
@@ -204,7 +216,7 @@ public sealed class TouchOverlayWindow : Window
         }
         catch (Exception)
         {
-            // A dropped link ends the experiment's input; it should not take the app down.
+            // A dropped link ends the touch input; it should not take the app down.
             _queue.Clear();
         }
         finally
