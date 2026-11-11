@@ -65,6 +65,32 @@ public sealed class TouchInputTests
     }
 
     [Fact]
+    public void Descriptor_declares_the_feature_that_keeps_the_mouse_on_linux()
+    {
+        // The kernel matches exactly: vendor usage 0xFF0000C5, 8-bit fields, 256 of them.
+        var map = HidDescriptors.ReportMapValue;
+        byte[] usage = [0x06, 0x00, 0xFF, 0x09, 0xC5];
+        byte[] shape = [0x75, 0x08, 0x96, 0x00, 0x01, 0xB1, 0x02];
+
+        var usageAt = map.AsSpan().IndexOf(usage);
+        Assert.True(usageAt >= 0, "vendor usage missing");
+        Assert.True(map.AsSpan(usageAt).IndexOf(shape) >= 0, "256-byte feature missing");
+        Assert.Equal(256, HidDescriptors.TouchCertificateLength);
+    }
+
+    [Fact]
+    public void Report_ids_are_all_different()
+    {
+        byte[] ids =
+        [
+            HidDescriptors.KeyboardReportId, HidDescriptors.MouseReportId,
+            HidDescriptors.TouchReportId, HidDescriptors.TouchCertificateReportId
+        ];
+
+        Assert.Equal(ids.Length, ids.Distinct().Count());
+    }
+
+    [Fact]
     public void Touch_report_id_is_distinct()
     {
         Assert.NotEqual(HidDescriptors.KeyboardReportId, HidDescriptors.TouchReportId);

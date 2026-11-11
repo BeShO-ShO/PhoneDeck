@@ -18,9 +18,12 @@ public static class HidDescriptors
     public const byte KeyboardReportId = 1;
     public const byte MouseReportId    = 2;
     public const byte TouchReportId    = 3;
+    public const byte TouchCertificateReportId = 4;
+    public const int TouchCertificateLength = 256;
 
     public const byte ReportTypeInput  = 1;
     public const byte ReportTypeOutput = 2;
+    public const byte ReportTypeFeature = 3;
 
     /// <summary>Caps Lock is bit 1 of the LED output report (Num Lock is bit 0).</summary>
     public const byte LedCapsLock = 0x02;
@@ -151,6 +154,16 @@ public static class HidDescriptors
         0x75, 0x08,       //   Report Size (8)
         0x95, 0x01,       //   Report Count (1)
         0x81, 0x02,       //   Input (Data,Var,Abs) - contact count
+        // Linux's multitouch driver drops Mouse collections in the same device unless it sees
+        // this 256-byte vendor feature, which marks a Windows 8 style touchscreen.
+        0x06, 0x00, 0xFF, //   Usage Page (Vendor 0xFF00)
+        0x09, 0xC5,       //   Usage (0xC5)
+        0x85, TouchCertificateReportId,
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x26, 0xFF, 0x00, //   Logical Maximum (255)
+        0x75, 0x08,       //   Report Size (8)
+        0x96, 0x00, 0x01, //   Report Count (256)
+        0xB1, 0x02,       //   Feature (Data,Var,Abs)
         0xC0              // End Collection
     ];
 }

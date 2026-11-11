@@ -136,7 +136,7 @@ public partial class App : Application
             MainWindow?.Hide();
 
             var layer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
-                () => _ = peripheral.StopCaptureAsync());
+                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch);
             layer.Closed += (_, _) =>
             {
                 _touchLayer = null;

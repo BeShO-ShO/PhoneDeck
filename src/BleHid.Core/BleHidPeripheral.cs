@@ -180,6 +180,8 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         _touchInput = await CreateInputReportAsync("Touch input report", service,
             HidDescriptors.TouchReportId, () => _lastTouchReport);
 
+        await CreateTouchCertificateReportAsync(service);
+
         await CreateBatteryServiceAsync();
 
         _advertisingStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -370,6 +372,57 @@ public sealed class BleHidPeripheral : IAsyncDisposable
 
         Record("Keyboard LED output report / Report Reference 0x2908",
             $"{descriptorResult.Error} (id={reportId}, type=Output)",
+            descriptorResult.Error == BluetoothError.Success);
+    }
+
+    /// <summary>
+    /// The feature report the descriptor declares. Its content is never checked, but the host
+    /// reads it once at setup, so it has to exist and answer long reads at any offset.
+    /// </summary>
+    private async Task CreateTouchCertificateReportAsync(GattLocalService service)
+    {
+        var parameters = new GattLocalCharacteristicParameters
+        {
+            CharacteristicProperties = GattCharacteristicProperties.Read | GattCharacteristicProperties.Write,
+            ReadProtectionLevel = _protection,
+            WriteProtectionLevel = _protection
+        };
+
+        var result = await service.CreateCharacteristicAsync(HidDescriptors.Report, parameters);
+        Record("Touch certificate feature report", result.Error.ToString(), result.Error == BluetoothError.Success);
+        if (result.Error != BluetoothError.Success) return;
+
+        var characteristic = result.Characteristic;
+        var certificate = new byte[HidDescriptors.TouchCertificateLength];
+
+        characteristic.ReadRequested += async (_, args) =>
+        {
+            using var deferral = args.GetDeferral();
+            var request = await args.GetRequestAsync();
+            Log?.Invoke($"[read] host read touch certificate at offset {request.Offset}");
+            var offset = (int)Math.Min(request.Offset, (uint)certificate.Length);
+            request.RespondWithValue(CryptographicBuffer.CreateFromByteArray(certificate[offset..]));
+        };
+
+        characteristic.WriteRequested += async (_, args) =>
+        {
+            using var deferral = args.GetDeferral();
+            var request = await args.GetRequestAsync();
+            if (request.Option == GattWriteOption.WriteWithResponse) request.Respond();
+        };
+
+        var descriptorParameters = new GattLocalDescriptorParameters
+        {
+            ReadProtectionLevel = _protection,
+            StaticValue = CryptographicBuffer.CreateFromByteArray(
+                [HidDescriptors.TouchCertificateReportId, HidDescriptors.ReportTypeFeature])
+        };
+
+        var descriptorResult = await characteristic.CreateDescriptorAsync(
+            HidDescriptors.ReportReference, descriptorParameters);
+
+        Record("Touch certificate / Report Reference 0x2908",
+            $"{descriptorResult.Error} (id={HidDescriptors.TouchCertificateReportId}, type=Feature)",
             descriptorResult.Error == BluetoothError.Success);
     }
 

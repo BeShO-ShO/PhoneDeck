@@ -114,6 +114,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
     public Task SendTouchAsync(bool down, int x, int y) =>
         _peripheral?.SendTouchAsync(down, x, y) ?? Task.CompletedTask;
 
+    public void LogTouch(string message) => Append($"[touch] {message}");
+
     public async Task SendKeyTapsAsync(IReadOnlyList<KeyTap> taps)
     {
         if (_peripheral is not { } peripheral) return;

@@ -27,17 +27,20 @@ public sealed class TouchOverlayWindow : Window
 
     private readonly Func<bool, int, int, Task> _send;
     private readonly Func<IReadOnlyList<KeyTap>, Task> _sendKeys;
+    private readonly Action<string> _log;
     private readonly TouchGestureRecognizer _gestures = new();
+    private int _loggedTouches;
     private readonly DispatcherTimer _timer;
     private readonly List<Button> _buttons = [];
     private readonly List<TouchEvent> _queue = [];
     private bool _pumping;
 
     public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys,
-        Action stopCapture)
+        Action stopCapture, Action<string> log)
     {
         _send = send;
         _sendKeys = sendKeys;
+        _log = log;
 
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -46,7 +49,6 @@ public sealed class TouchOverlayWindow : Window
         Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
         Topmost = true;
         ShowInTaskbar = false;
-        ShowActivated = false;
         WindowState = WindowState.Maximized;
         // Capture parks the real cursor mid-screen, where it would otherwise sit on top of the video.
         Cursor = Cursors.None;
@@ -82,6 +84,12 @@ public sealed class TouchOverlayWindow : Window
         _timer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(15) };
         _timer.Tick += (_, _) => Apply(_gestures.Tick(Environment.TickCount64));
         _timer.Start();
+
+        Loaded += (_, _) =>
+        {
+            Activate();
+            _log($"layer open {ActualWidth:F0}x{ActualHeight:F0}");
+        };
     }
 
     // A flat template: the theme's button is opaque and sized for text, not a bar over video.
@@ -133,7 +141,9 @@ public sealed class TouchOverlayWindow : Window
 
         e.Handled = true;
         var point = e.GetTouchPoint(this).Position;
-        if (!TouchMapper.IsInsideVideo(point.X, point.Y, ActualWidth, ActualHeight, VideoAspect)) return;
+        var inside = TouchMapper.IsInsideVideo(point.X, point.Y, ActualWidth, ActualHeight, VideoAspect);
+        if (_loggedTouches++ < 10) _log($"finger at {point.X:F0},{point.Y:F0} inside video: {inside}");
+        if (!inside) return;
 
         CaptureTouch(e.TouchDevice);
         Apply(_gestures.FingerDown(e.TouchDevice.Id, point.X, point.Y, Environment.TickCount64));
@@ -214,9 +224,10 @@ public sealed class TouchOverlayWindow : Window
                 await Task.Delay(SendIntervalMs);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // A dropped link ends the touch input; it should not take the app down.
+            _log($"send failed: {ex.Message}");
             _queue.Clear();
         }
         finally
