@@ -66,6 +66,17 @@ public sealed class PeripheralService : INotifyPropertyChanged
     /// <summary>Running with nothing live: after a restart the phone has to be told to reconnect.</summary>
     public bool NeedsReconnect => IsRunning && KeyboardSubscribers == 0;
 
+    private string _headline = "Bluetooth is off";
+    /// <summary>The home screen's main line: the connected device, or what is missing.</summary>
+    public string Headline { get => _headline; private set => Set(ref _headline, value); }
+
+    private string _detail = "Starting…";
+    public string Detail { get => _detail; private set => Set(ref _detail, value); }
+
+    public string CaptureButtonText => IsCapturing ? "Stop capture" : "Start capture";
+
+    public bool CanToggleCapture => IsCapturing || CanCapture;
+
     private string _connectionText = ConnectionSummary.Describe(false, []);
     public string ConnectionText { get => _connectionText; private set => Set(ref _connectionText, value); }
 
@@ -192,6 +203,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
             AdvertisementStatus = "Stopped";
             KeyboardSubscribers = MouseSubscribers = 0;
             ConnectionText = ConnectionSummary.Describe(false, []);
+            Headline = "Bluetooth is off";
+            Detail = "Start it from the Details page.";
             Target = "nothing yet";
             Append("peripheral stopped");
         }
@@ -456,8 +469,20 @@ public sealed class PeripheralService : INotifyPropertyChanged
         AdvertisementStatus = _peripheral.AdvertisementStatus.ToString();
         KeyboardSubscribers = _peripheral.SubscribedKeyboardClients;
         MouseSubscribers = _peripheral.SubscribedMouseClients;
-        ConnectionText = ConnectionSummary.Describe(true, _peripheral.Hosts()
-            .Select(h => h.Name is { Length: > 0 } name ? name : h.Address).ToList());
+        var hostNames = _peripheral.Hosts()
+            .Select(h => h.Name is { Length: > 0 } name ? name : h.Address).ToList();
+        ConnectionText = ConnectionSummary.Describe(true, hostNames);
+        Headline = hostNames.Count switch
+        {
+            0 => "No phone connected",
+            1 => hostNames[0],
+            _ => $"{hostNames.Count} devices connected"
+        };
+        Detail = hostNames.Count == 0
+            ? "On your phone, tap Connect for this PC in Bluetooth settings."
+            : _peripheral.ConnectionIntervalMs(_peripheral.SelectedHostId) is { } linkMs
+                ? $"Connected · Bluetooth link {linkMs} ms"
+                : "Connected";
         // Ctrl+D+C changes the target without going through the UI, so mirror it back.
         SyncTargetState();
         LinkIntervalMs = _peripheral.MouseReportIntervalMs(PointerIntervalMs);
@@ -496,11 +521,14 @@ public sealed class PeripheralService : INotifyPropertyChanged
         {
             OnPropertyChanged(nameof(CanCapture));
             OnPropertyChanged(nameof(NeedsReconnect));
+            OnPropertyChanged(nameof(CanToggleCapture));
         }
         if (name is nameof(IsCapturing))
         {
             OnPropertyChanged(nameof(IsRedirecting));
             OnPropertyChanged(nameof(IsCapturingLocally));
+            OnPropertyChanged(nameof(CaptureButtonText));
+            OnPropertyChanged(nameof(CanToggleCapture));
         }
     }
 }

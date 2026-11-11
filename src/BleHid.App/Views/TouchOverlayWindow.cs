@@ -22,7 +22,7 @@ public sealed class TouchOverlayWindow : Window
     private static readonly Geometry HomeIcon = new RectangleGeometry(new Rect(3, 3, 18, 18), 5, 5);
     private static readonly Geometry BackIcon = Geometry.Parse("M15,3 L6,12 L15,21");
     private static readonly Geometry SplitIcon = Geometry.Parse("M3,4 H21 V20 H3 Z M12,4 V20");
-    private static readonly Geometry StopIcon = Geometry.Parse("M5,5 L19,19 M19,5 L5,19");
+    private static readonly Geometry PauseIcon = Geometry.Parse("M8,5 V19 M16,5 V19");
 
     private readonly Func<bool, int, int, Task> _send;
     private readonly Func<IReadOnlyList<KeyTap>, Task> _sendKeys;
@@ -33,7 +33,7 @@ public sealed class TouchOverlayWindow : Window
     private bool _pumping;
 
     public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys,
-        Action stopCapture, Action<string> log)
+        Action stopCapture, Action<string> log, string targetName)
     {
         _send = send;
         _sendKeys = sendKeys;
@@ -45,26 +45,59 @@ public sealed class TouchOverlayWindow : Window
         Topmost = true;
         ShowInTaskbar = false;
         ShowActivated = false;
-        SizeToContent = SizeToContent.WidthAndHeight;
+        SizeToContent = SizeToContent.Height;
+        Width = 640;
 
-        var stopButton = MakeButton("Stop capture", StopIcon);
-        stopButton.Margin = new Thickness(32, 0, 8, 0);
-        stopButton.Click += (_, _) => stopCapture();
+        var pauseButton = MakeButton("Stop capture", PauseIcon);
+        pauseButton.Click += (_, _) => stopCapture();
 
-        Content = new StackPanel
+        // Says where input is going, so a glance at the bar answers "is this on?".
+        var status = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Margin = new Thickness(4),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0),
+            Children =
+            {
+                new System.Windows.Shapes.Ellipse
+                {
+                    Width = 8, Height = 8, Fill = LiveBrush,
+                    VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0)
+                },
+                new TextBlock
+                {
+                    Text = ShortName(targetName), Foreground = LiveBrush, FontSize = 13,
+                    MaxWidth = 140, TextTrimming = TextTrimming.CharacterEllipsis,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            }
+        };
+
+        var navigation = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
             Children =
             {
                 // Split screen, then Samsung's navigation bar order: Recents, Home, Back.
                 MakeNavigationButton("Split screen", SplitIcon, PhoneNavigation.SplitScreen),
                 MakeNavigationButton("Recents", RecentsIcon, PhoneNavigation.Recents),
                 MakeNavigationButton("Home", HomeIcon, PhoneNavigation.Home),
-                MakeNavigationButton("Back", BackIcon, PhoneNavigation.Back),
-                stopButton
+                MakeNavigationButton("Back", BackIcon, PhoneNavigation.Back)
             }
         };
+
+        var layout = new Grid { Margin = new Thickness(4) };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(navigation, 1);
+        Grid.SetColumn(pauseButton, 2);
+        pauseButton.HorizontalAlignment = HorizontalAlignment.Right;
+        layout.Children.Add(status);
+        layout.Children.Add(navigation);
+        layout.Children.Add(pauseButton);
+        Content = layout;
 
         Loaded += (_, _) => PlaceInBlackBar();
         _reader = new RawTouchReader(OnContact, log);
@@ -81,13 +114,23 @@ public sealed class TouchOverlayWindow : Window
         _log($"bar placed; screen {screenWidth:F0}x{screenHeight:F0}, black bar {barHeight:F0}");
     }
 
-    // A flat template: the theme's button is sized for text, not a compact icon bar.
+    private static readonly Brush LiveBrush = new SolidColorBrush(Color.FromRgb(0xE2, 0x4B, 0x4A));
+
+    /// <summary>The device name without the Bluetooth address the target display appends.</summary>
+    private static string ShortName(string target)
+    {
+        var bracket = target.IndexOf(" [", StringComparison.Ordinal);
+        return bracket > 0 ? target[..bracket] : target;
+    }
+
+    // A flat, borderless template: icons alone read cleaner on a black bar than boxed buttons.
+    // Transparent rather than null, so the whole padded area still takes the tap.
     private static ControlTemplate FlatTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
-        border.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)));
-        border.SetValue(Border.PaddingProperty, new Thickness(28, 12, 28, 12));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        border.SetValue(Border.PaddingProperty, new Thickness(24, 12, 24, 12));
 
         var content = new FrameworkElementFactory(typeof(ContentPresenter));
         content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);

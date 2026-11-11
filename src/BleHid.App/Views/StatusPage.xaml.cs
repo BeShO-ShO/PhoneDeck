@@ -14,6 +14,10 @@ public partial class StatusPage : Page
         DataContext = _service;
         _service.Log.CollectionChanged += OnLogChanged;
         Unloaded += (_, _) => _service.Log.CollectionChanged -= OnLogChanged;
+        // On Loaded rather than here: pages are kept, and the setting can change in between.
+        Loaded += (_, _) => ChordHint.Visibility = AppSettings.Instance.EnableCtrlDCSwitch
+            ? System.Windows.Visibility.Visible
+            : System.Windows.Visibility.Collapsed;
     }
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)

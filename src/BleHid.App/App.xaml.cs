@@ -145,7 +145,7 @@ public partial class App : Application
             // The bar's X matches Ctrl+Alt+Q: capture stops but BleHid keeps running, so the same
             // keys turn it straight back on.
             _touchLayer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
-                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch);
+                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch, peripheral.Target);
             _touchLayer.Show();
         }
         else if (!peripheral.IsRedirecting && _redirectUiActive)

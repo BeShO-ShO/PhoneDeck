@@ -37,15 +37,15 @@
                        IsBackButtonVisible="Collapsed"
                        IsPaneToggleVisible="True">
       <ui:NavigationView.MenuItems>
-        <ui:NavigationViewItem Content="Status" TargetPageType="{x:Type views:StatusPage}">
+        <ui:NavigationViewItem Content="Home" TargetPageType="{x:Type views:HomePage}">
           <ui:NavigationViewItem.Icon>
-            <ui:SymbolIcon Symbol="Info24" />
+            <ui:SymbolIcon Symbol="Keyboard24" />
           </ui:NavigationViewItem.Icon>
         </ui:NavigationViewItem>
 
-        <ui:NavigationViewItem Content="Capture" TargetPageType="{x:Type views:CapturePage}">
+        <ui:NavigationViewItem Content="Details" TargetPageType="{x:Type views:StatusPage}">
           <ui:NavigationViewItem.Icon>
-            <ui:SymbolIcon Symbol="Keyboard24" />
+            <ui:SymbolIcon Symbol="Info24" />
           </ui:NavigationViewItem.Icon>
         </ui:NavigationViewItem>
       </ui:NavigationView.MenuItems>

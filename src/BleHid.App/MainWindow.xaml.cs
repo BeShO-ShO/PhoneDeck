@@ -15,7 +15,7 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         // Applies the Mica backdrop and keeps tracking light/dark changes made while running.
         SystemThemeWatcher.Watch(this);
-        Loaded += (_, _) => RootNavigation.Navigate(typeof(StatusPage));
+        Loaded += (_, _) => RootNavigation.Navigate(typeof(HomePage));
     }
 
     // Staying resident keeps the GATT attribute table alive, which is what hosts reconnect to.

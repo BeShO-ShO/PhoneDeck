@@ -85,6 +85,13 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     private int CountLiveClients(GattLocalCharacteristic? characteristic) =>
         characteristic?.SubscribedClients.Count(client => IsUsableHost(client.Session.DeviceId.Id)) ?? 0;
 
+    /// <summary>The negotiated link interval to a host (the first one when null), if Windows reported it.</summary>
+    public int? ConnectionIntervalMs(string? deviceId = null)
+    {
+        var id = deviceId ?? Hosts().FirstOrDefault()?.DeviceId;
+        return id is not null && _connectionIntervalsMs.TryGetValue(id, out var ms) ? ms : null;
+    }
+
     public int MouseReportIntervalMs(int configuredIntervalMs)
     {
         if (_pointerPacing.Warning is { } warning && Interlocked.Exchange(ref _pacingWarningLogged, 1) == 0)

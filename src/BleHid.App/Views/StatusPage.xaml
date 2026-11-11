@@ -4,7 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:conv="clr-namespace:BleHid.App.Converters"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-      Title="Status">
+      Title="Details">
 
   <Page.Resources>
     <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
@@ -16,8 +16,8 @@
        scroller swallows the wheel without being able to scroll. -->
   <StackPanel Margin="24,0,24,24">
 
-      <ui:TextBlock Text="Status" FontTypography="TitleLarge" Margin="0,0,0,4" />
-      <ui:TextBlock Text="Publish the keyboard and mouse services, then pair from the device you want to control."
+      <ui:TextBlock Text="Details" FontTypography="TitleLarge" Margin="0,0,0,4" />
+      <ui:TextBlock Text="The Bluetooth service, connection details, pointer pacing, shortcuts, and logs."
                     FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                     TextWrapping="Wrap" Margin="0,0,0,20" />
 
@@ -92,6 +92,49 @@
           <ui:TextBlock Text="{Binding MouseSubscribers}" FontTypography="TitleLarge" />
         </ui:CardControl>
       </Grid>
+
+      <ui:TextBlock Text="Pointer" FontTypography="Subtitle" Margin="0,0,0,8" />
+
+      <ui:CardControl Icon="{ui:SymbolIcon Timer24}" Margin="0,0,0,20">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Minimum pointer interval" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="{Binding LinkIntervalMs, StringFormat='Paced to {0} ms right now — whichever is slower of this minimum and the connection interval the phone negotiated.'}" />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Slider Width="160" Minimum="5" Maximum="50" TickFrequency="5" IsSnapToTickEnabled="True"
+                  VerticalAlignment="Center"
+                  Value="{Binding PointerIntervalMs, Mode=TwoWay}" />
+          <ui:TextBlock Width="52" Margin="12,0,0,0" VerticalAlignment="Center"
+                        Text="{Binding PointerIntervalMs, StringFormat='{}{0} ms'}" />
+        </StackPanel>
+      </ui:CardControl>
+
+      <ui:TextBlock Text="Shortcuts" FontTypography="Subtitle" Margin="0,0,0,8" />
+
+      <ui:CardControl Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
+        <ui:CardControl.Header>
+          <ui:TextBlock Text="Switch to the next target" FontTypography="BodyStrong" />
+        </ui:CardControl.Header>
+        <StackPanel MaxWidth="240">
+          <ui:TextBlock Text="Ctrl + Alt + CapsLock" FontFamily="Cascadia Mono, Consolas"
+                        FontTypography="Body" TextWrapping="Wrap" />
+          <ui:TextBlock x:Name="ChordHint" Text="or Ctrl + D + C" FontFamily="Cascadia Mono, Consolas"
+                        FontTypography="Body" TextWrapping="Wrap" Margin="0,4,0,0"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+      </ui:CardControl>
+
+      <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,20">
+        <ui:CardControl.Header>
+          <ui:TextBlock Text="Turn capture on or off" FontTypography="BodyStrong" />
+        </ui:CardControl.Header>
+        <ui:TextBlock Text="Ctrl + Alt + Q" FontFamily="Cascadia Mono, Consolas"
+                      FontTypography="Body" />
+      </ui:CardControl>
 
       <ui:TextBlock Text="Logs" FontTypography="Subtitle" Margin="0,0,0,8" />
       <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
