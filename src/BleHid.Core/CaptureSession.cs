@@ -118,10 +118,12 @@ public static class CaptureSession
         bool stopEndsSession,
         CancellationToken cancellationToken,
         bool chordSwitch = true,
-        bool touchGoesToHost = false)
+        bool touchGoesToHost = false,
+        bool capsLockSwitch = true)
     {
         using var capture = new InputCapture { Verbose = verbose };
         capture.SetChordSwitch(chordSwitch);
+        capture.SetCapsLockSwitch(capsLockSwitch);
         capture.SetTouchGoesToHost(touchGoesToHost);
         var stopped = new TaskCompletionSource();
         using var registration = cancellationToken.Register(() => stopped.TrySetResult());
@@ -295,9 +297,9 @@ public static class CaptureSession
 
             log($"  pointer report interval: {PointerIntervalMs()} ms");
             log($"  sending to: {peripheral.SelectedHostDisplay}");
-            log(chordSwitch
-                ? "  Ctrl+Alt+CapsLock or Ctrl+D+C switches target."
-                : "  Ctrl+Alt+CapsLock switches target.");
+            var switchKeys = new[] { capsLockSwitch ? "Ctrl+Alt+CapsLock" : null, chordSwitch ? "Ctrl+D+C" : null }
+                .Where(key => key is not null).ToList();
+            if (switchKeys.Count > 0) log($"  {string.Join(" or ", switchKeys)} switches target.");
             log(stopEndsSession
                 ? "  capturing - Ctrl+Alt+Q stops."
                 : "  capturing - Ctrl+Alt+Q returns input to this PC.");

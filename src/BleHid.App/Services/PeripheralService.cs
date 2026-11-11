@@ -296,6 +296,19 @@ public sealed class PeripheralService : INotifyPropertyChanged
         SyncSelection();
     }
 
+    private void PreferRemoteTarget()
+    {
+        if (_peripheral is null) return;
+
+        var index = TargetRestore.StartIndex(_peripheral.IsLocalTarget, AppSettings.Instance.LastHostId,
+            _peripheral.Hosts().Select(h => h.DeviceId).ToList());
+        if (index < 0 || !_peripheral.SelectHost(index)) return;
+
+        Target = _peripheral.SelectedHostDisplay;
+        Append($"[host] capture starting on {Target}");
+        SyncSelection();
+    }
+
     private int IndexOf(string? deviceId)
     {
         if (_peripheral is null || deviceId is null) return -1;
@@ -368,6 +381,9 @@ public sealed class PeripheralService : INotifyPropertyChanged
         if (_peripheral is null || IsCapturing) return;
         if (!armEarly && !CanCapture) return;
 
+        // A tray launch arms on This PC on purpose; a deliberate start should reach the phone.
+        if (!armEarly) PreferRemoteTarget();
+
         _captureCancellation = new CancellationTokenSource();
         IsCapturing = true;
 
@@ -381,7 +397,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
             {
                 await CaptureSession.RunAsync(peripheral, Append, verbose: false, () => PointerIntervalMs,
                     stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch,
-                    touchGoesToHost: AppSettings.Instance.TouchLayerEnabled);
+                    touchGoesToHost: AppSettings.Instance.TouchLayerEnabled,
+                    capsLockSwitch: AppSettings.Instance.EnableCapsLockSwitch);
             }
             catch (Exception ex)
             {

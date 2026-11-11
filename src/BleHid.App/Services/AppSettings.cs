@@ -29,6 +29,18 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _startPeripheralOnLaunch, value)) Save(); }
     }
 
+    private bool _enableCapsLockSwitch;
+
+    /// <summary>
+    /// Off by default: with one phone, Ctrl+Alt+Q already switches between it and this PC, and a
+    /// stray Ctrl+Alt+CapsLock would leave capture running with input on this PC.
+    /// </summary>
+    public bool EnableCapsLockSwitch
+    {
+        get => _enableCapsLockSwitch;
+        set { if (Set(ref _enableCapsLockSwitch, value)) Save(); }
+    }
+
     private bool _enableCtrlDCSwitch;
 
     /// <summary>Off by default: the chord can leak a keypress to the host being controlled.</summary>

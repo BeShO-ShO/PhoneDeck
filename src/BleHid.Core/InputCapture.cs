@@ -49,6 +49,7 @@ public sealed class InputCapture : IDisposable
     private volatile bool _passThrough;
     private volatile bool _running;
     private volatile bool _chordSwitchEnabled = true;
+    private volatile bool _capsLockSwitchEnabled = true;
     private volatile bool _touchGoesToHost;
     // Swapped from the settings-watcher thread while the hook thread reads it, so the field has
     // to be volatile even though the reference assignment itself is atomic.
@@ -88,6 +89,12 @@ public sealed class InputCapture : IDisposable
     /// the current target, so callers may prefer Ctrl+Alt+CapsLock alone.
     /// </summary>
     public void SetChordSwitch(bool enabled) => _chordSwitchEnabled = enabled;
+
+    /// <summary>
+    /// Turns the Ctrl+Alt+CapsLock switch on or off. When off, the combination is an ordinary
+    /// Caps Lock press with modifiers, sent wherever input is going.
+    /// </summary>
+    public void SetCapsLockSwitch(bool enabled) => _capsLockSwitchEnabled = enabled;
 
     /// <summary>
     /// When on, touches on the video are for the host, so the mouse events Windows makes from
@@ -377,7 +384,7 @@ public sealed class InputCapture : IDisposable
         if (isDown) _pressedVirtualKeys.Add(virtualKey);
         else _pressedVirtualKeys.Remove(virtualKey);
 
-        if (virtualKey == 0x14)
+        if (virtualKey == 0x14 && _capsLockSwitchEnabled)
         {
             if (_capsLockSwitchLatched)
             {

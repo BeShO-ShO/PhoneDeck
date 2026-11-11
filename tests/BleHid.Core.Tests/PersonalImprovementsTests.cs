@@ -115,6 +115,64 @@ public sealed class PersonalImprovementsTests
     }
 
     [Fact]
+    public void Disabled_caps_lock_switch_sends_caps_lock_instead_of_switching()
+    {
+        using var capture = new InputCapture();
+        capture.SetCapsLockSwitch(false);
+        var switches = 0;
+        var reports = new List<byte[]>();
+        capture.SwitchHostRequested += () => switches++;
+        capture.KeyboardReport += (_, usages) => reports.Add(usages);
+
+        capture.HandleKeyboardEvent(LeftControl, true);
+        capture.HandleKeyboardEvent(LeftAlt, true);
+        capture.HandleKeyboardEvent(0x14, true);
+
+        Assert.Equal(0, switches);
+        Assert.Contains(reports, usages => usages.Contains((byte)0x39));
+    }
+
+    [Fact]
+    public void Disabled_caps_lock_switch_keeps_the_stop_hotkey()
+    {
+        using var capture = new InputCapture();
+        capture.SetCapsLockSwitch(false);
+        var stops = 0;
+        capture.StopRequested += () => stops++;
+
+        capture.HandleKeyboardEvent(LeftControl, true);
+        capture.HandleKeyboardEvent(LeftAlt, true);
+        capture.HandleKeyboardEvent(Q, true);
+
+        Assert.Equal(1, stops);
+    }
+
+    [Fact]
+    public void Start_moves_off_this_pc_to_the_remembered_phone()
+    {
+        Assert.Equal(1, TargetRestore.StartIndex(true, "TABLET", Hosts));
+    }
+
+    [Fact]
+    public void Start_falls_back_to_the_first_device_when_the_remembered_one_is_missing()
+    {
+        Assert.Equal(0, TargetRestore.StartIndex(true, "gone", Hosts));
+        Assert.Equal(0, TargetRestore.StartIndex(true, null, Hosts));
+    }
+
+    [Fact]
+    public void Start_keeps_a_device_that_is_already_selected()
+    {
+        Assert.Equal(-1, TargetRestore.StartIndex(false, "phone", Hosts));
+    }
+
+    [Fact]
+    public void Start_stays_on_this_pc_when_nothing_is_connected()
+    {
+        Assert.Equal(-1, TargetRestore.StartIndex(true, "phone", []));
+    }
+
+    [Fact]
     public void Summary_says_not_running()
     {
         Assert.Equal("Not running", ConnectionSummary.Describe(false, ["phone"]));

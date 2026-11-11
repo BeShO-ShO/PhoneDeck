@@ -62,6 +62,18 @@
       <ui:ToggleSwitch x:Name="SwitchGestureToggle" Click="OnSwitchGestureChanged" />
     </ui:CardControl>
 
+    <ui:CardControl Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Switch target with Ctrl+Alt+CapsLock" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Cycles between this PC and each paired device while capture stays on. Only useful with more than one device: with one phone, Ctrl+Alt+Q already switches. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding EnableCapsLockSwitch, Mode=TwoWay}" />
+    </ui:CardControl>
+
     <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,8">
       <ui:CardControl.Header>
         <StackPanel>

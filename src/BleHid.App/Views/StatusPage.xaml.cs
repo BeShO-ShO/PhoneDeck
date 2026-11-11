@@ -14,10 +14,22 @@ public partial class StatusPage : Page
         DataContext = _service;
         _service.Log.CollectionChanged += OnLogChanged;
         Unloaded += (_, _) => _service.Log.CollectionChanged -= OnLogChanged;
-        // On Loaded rather than here: pages are kept, and the setting can change in between.
-        Loaded += (_, _) => ChordHint.Visibility = AppSettings.Instance.EnableCtrlDCSwitch
-            ? System.Windows.Visibility.Visible
-            : System.Windows.Visibility.Collapsed;
+        // On Loaded rather than here: pages are kept, and the settings can change in between.
+        Loaded += (_, _) => ShowSwitchKeys();
+    }
+
+    /// <summary>Lists only the target-switch keys that are turned on, and hides the card if none are.</summary>
+    private void ShowSwitchKeys()
+    {
+        var caps = AppSettings.Instance.EnableCapsLockSwitch;
+        var chord = AppSettings.Instance.EnableCtrlDCSwitch;
+        static System.Windows.Visibility Show(bool on) =>
+            on ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+
+        SwitchCard.Visibility = Show(caps || chord);
+        CapsHint.Visibility = Show(caps);
+        ChordHint.Visibility = Show(chord);
+        ChordHint.Text = caps ? "or Ctrl + D + C" : "Ctrl + D + C";
     }
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)

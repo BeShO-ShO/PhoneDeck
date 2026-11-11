@@ -114,12 +114,12 @@
 
       <ui:TextBlock Text="Shortcuts" FontTypography="Subtitle" Margin="0,0,0,8" />
 
-      <ui:CardControl Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
+      <ui:CardControl x:Name="SwitchCard" Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
         <ui:CardControl.Header>
           <ui:TextBlock Text="Switch to the next target" FontTypography="BodyStrong" />
         </ui:CardControl.Header>
         <StackPanel MaxWidth="240">
-          <ui:TextBlock Text="Ctrl + Alt + CapsLock" FontFamily="Cascadia Mono, Consolas"
+          <ui:TextBlock x:Name="CapsHint" Text="Ctrl + Alt + CapsLock" FontFamily="Cascadia Mono, Consolas"
                         FontTypography="Body" TextWrapping="Wrap" />
           <ui:TextBlock x:Name="ChordHint" Text="or Ctrl + D + C" FontFamily="Cascadia Mono, Consolas"
                         FontTypography="Body" TextWrapping="Wrap" Margin="0,4,0,0"
