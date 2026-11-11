@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -57,11 +58,12 @@ public sealed class TouchOverlayWindow : Window
             Margin = new Thickness(0, 0, 0, 16),
             Children =
             {
-                MakeNavigationButton("Back A", PhoneNavigation.BackA),
-                MakeNavigationButton("Back B", PhoneNavigation.BackB),
-                MakeNavigationButton("Back C", PhoneNavigation.BackC),
-                MakeNavigationButton("Home", PhoneNavigation.Home),
-                MakeNavigationButton("Recents", PhoneNavigation.Recents)
+                // Left to right as on a Samsung navigation bar: Recents, Home, Back.
+                MakeNavigationButton("Recents", RecentsIcon, PhoneNavigation.Recents),
+                MakeNavigationButton("Home", HomeIcon, PhoneNavigation.Home),
+                MakeNavigationButton("Back A", BackIcon, PhoneNavigation.BackA, "A"),
+                MakeNavigationButton("Back B", BackIcon, PhoneNavigation.BackB, "B"),
+                MakeNavigationButton("Back C", BackIcon, PhoneNavigation.BackC, "C")
             }
         };
 
@@ -77,9 +79,64 @@ public sealed class TouchOverlayWindow : Window
         return button;
     }
 
-    private Button MakeNavigationButton(string text, KeyTap[] taps)
+    private static readonly Geometry RecentsIcon = Geometry.Parse("M5,4 V20 M12,4 V20 M19,4 V20");
+    private static readonly Geometry HomeIcon = new RectangleGeometry(new Rect(3, 3, 18, 18), 5, 5);
+    private static readonly Geometry BackIcon = Geometry.Parse("M15,3 L6,12 L15,21");
+
+    // A flat template: the theme's button is opaque and sized for text, not a bar over video.
+    private static ControlTemplate FlatTemplate()
     {
-        var button = MakeButton(text);
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)));
+        border.SetValue(Border.PaddingProperty, new Thickness(28, 12, 28, 12));
+
+        var content = new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.AppendChild(content);
+
+        return new ControlTemplate(typeof(Button)) { VisualTree = border };
+    }
+
+    private static UIElement MakeIcon(Geometry icon, string? badge)
+    {
+        var path = new System.Windows.Shapes.Path
+        {
+            Data = icon,
+            Width = 24,
+            Height = 24,
+            Stroke = Brushes.White,
+            StrokeThickness = 2.4,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round
+        };
+        if (badge is null) return path;
+
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children =
+            {
+                path,
+                new TextBlock
+                {
+                    Text = badge,
+                    Foreground = Brushes.White,
+                    FontSize = 14,
+                    Margin = new Thickness(4, 0, 0, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            }
+        };
+    }
+
+    private Button MakeNavigationButton(string name, Geometry icon, KeyTap[] taps, string? badge = null)
+    {
+        var button = new Button { Content = MakeIcon(icon, badge), Template = FlatTemplate() };
+        AutomationProperties.SetName(button, name);
+        _buttons.Add(button);
         button.Margin = new Thickness(8, 0, 8, 0);
         button.Click += async (_, _) =>
         {
