@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:conv="clr-namespace:BleHid.App.Converters"
+      xmlns:services="clr-namespace:BleHid.App.Services"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
       Title="Capture">
 
@@ -45,6 +46,19 @@
                          IsChecked="{Binding IsCapturing, Mode=OneWay}"
                          IsEnabled="{Binding CanCapture}"
                          Click="OnToggleCapture" />
+      </ui:CardControl>
+
+      <!-- The same setting as on the Settings page, here because this is where capture starts. -->
+      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,16">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Touches on the full-screen video go to the phone, with the button bar below it. Set this before turning capture on." />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
       </ui:CardControl>
 
       <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,16"
