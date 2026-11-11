@@ -37,6 +37,9 @@ public sealed class PeripheralService : INotifyPropertyChanged
     private bool _applyingSelection;
     private bool _refreshingHosts;
     private int _pollTicks;
+    // Set once the remembered host is restored or anything chooses a target, so a deliberate
+    // choice made during this run is never overridden.
+    private bool _targetDecided;
     // Null rather than empty: no hosts yet is a real signature the list still has to be built for.
     private string? _hostSignature;
 
@@ -115,8 +118,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
             await Task.Run(peripheral.StartAsync);
             _peripheral = peripheral;
             IsRunning = true;
-            // Without this the peripheral starts in broadcast mode and every report is duplicated
-            // to all subscribed hosts, which is both surprising and slow.
+            _targetDecided = false;
             peripheral.SelectLocal();
             _poll.Start();
             RefreshCounters();
@@ -179,6 +181,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
                 foreach (var host in _peripheral.Hosts()) Hosts.Add(host);
                 _hostSignature = signature;
                 RebuildTargets();
+                RestoreLastTarget();
             }
 
             SyncTargetState();
@@ -192,6 +195,13 @@ public sealed class PeripheralService : INotifyPropertyChanged
     public void Select(TargetOption option)
     {
         if (_peripheral is null || _applyingSelection) return;
+
+        // A list rebuild can re-raise Checked for the current target; only a real change is a choice.
+        var alreadySelected = option.Kind == TargetKind.Local
+            ? _peripheral.IsLocalTarget
+            : !_peripheral.IsLocalTarget && string.Equals(
+                _peripheral.SelectedHostId, option.DeviceId, StringComparison.OrdinalIgnoreCase);
+        if (!alreadySelected) _targetDecided = true;
 
         switch (option.Kind)
         {
@@ -214,6 +224,26 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
         Target = _peripheral.SelectedHostDisplay;
         Append($"[host] -> {Target}");
+        SyncSelection();
+    }
+
+    /// <summary>
+    /// Reselects the remembered host when it reconnects. Only the target changes: input stays on
+    /// this PC until capture is turned on.
+    /// </summary>
+    private void RestoreLastTarget()
+    {
+        if (_peripheral is null) return;
+
+        var index = TargetRestore.FindIndex(_targetDecided, IsCapturing, _peripheral.IsLocalTarget,
+            AppSettings.Instance.LastHostId, _peripheral.Hosts().Select(h => h.DeviceId).ToList());
+        if (index < 0) return;
+
+        _targetDecided = true;
+        if (!_peripheral.SelectHost(index)) return;
+
+        Target = _peripheral.SelectedHostDisplay;
+        Append($"[host] restored last target -> {Target}");
         SyncSelection();
     }
 
@@ -338,6 +368,13 @@ public sealed class PeripheralService : INotifyPropertyChanged
         {
             _dispatcher.BeginInvoke(OnTargetChanged);
             return;
+        }
+
+        // Covers hotkey switches as well as the list, so whichever host was used last is remembered.
+        if (_peripheral?.SelectedHostId is { } hostId)
+        {
+            _targetDecided = true;
+            AppSettings.Instance.LastHostId = hostId;
         }
 
         SyncTargetState();

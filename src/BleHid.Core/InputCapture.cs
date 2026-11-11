@@ -312,9 +312,8 @@ public sealed class InputCapture : IDisposable
 
         if (isDown && virtualKey == 0x51 && IsDown(0x11) && IsDown(0x12)) // Ctrl+Alt+Q
         {
-            _pressedUsages.Clear();
             _pressedVirtualKeys.Clear();
-            KeyboardReport?.Invoke(KeyModifiers.None, []);
+            ReleaseHeldInput();
             StopRequested?.Invoke();
             return true;
         }
@@ -355,9 +354,17 @@ public sealed class InputCapture : IDisposable
 
     private void RequestHostSwitch()
     {
-        // Release everything held before the target changes. These reports are queued ahead of
-        // the switch, so the outgoing host sees the release instead of being left with a key or
-        // a mouse button stuck down.
+        ReleaseHeldInput();
+        SwitchHostRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Releases everything held before input leaves a host. These reports are queued ahead of the
+    /// target change, so the host sees the release instead of being left with a key or a mouse
+    /// button stuck down.
+    /// </summary>
+    private void ReleaseHeldInput()
+    {
         _pressedUsages.Clear();
         KeyboardReport?.Invoke(KeyModifiers.None, []);
         if (_buttons != MouseButtons.None)
@@ -365,7 +372,6 @@ public sealed class InputCapture : IDisposable
             _buttons = MouseButtons.None;
             MouseReport?.Invoke(_buttons, 0, 0, 0);
         }
-        SwitchHostRequested?.Invoke();
     }
 
     /// <summary>

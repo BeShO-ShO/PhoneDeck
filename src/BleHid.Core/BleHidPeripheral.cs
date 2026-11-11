@@ -34,7 +34,8 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         PointerPacingOverrides.Load(AppPaths.InRoot("pointer-pacing.json"));
     private int _pacingWarningLogged;
     private string? _selectedHostId;
-    private bool _localOnly;
+    // Starts local so nothing reaches a host until a target is deliberately chosen.
+    private bool _localOnly = true;
     private bool _warnedMissingHost;
     private bool _everAdvertised;
     private TaskCompletionSource<bool>? _advertisingStarted;
@@ -623,6 +624,8 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         _lastMouseReport = HidReports.Mouse(buttons, dx, dy, wheel);
         return NotifyAsync(_mouseInput, _lastMouseReport);
     }
+
+    public Task ReleaseMouseAsync() => SendMouseAsync(MouseButtons.None, 0, 0, 0);
 
     /// <summary>Subscribed hosts, de-duplicated across the keyboard and mouse reports.</summary>
     public IReadOnlyList<HostTarget> Hosts()

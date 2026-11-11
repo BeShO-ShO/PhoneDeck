@@ -41,6 +41,9 @@ catch (Exception ex)
     return 1;
 }
 
+// The console's type/key/move commands act on whatever is connected, so it opts in to broadcast.
+peripheral.SelectAllHosts();
+
 Console.WriteLine($"""
 
     Advertisement status: {peripheral.AdvertisementStatus}

@@ -72,6 +72,36 @@ public static class CaptureSession
         }
     }
 
+    private static readonly TimeSpan ShutdownStepTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Runs one shutdown step without letting it block or abort the steps after it: a notification
+    /// to a host that just vanished can hang, and key release still has to be attempted.
+    /// </summary>
+    internal static async Task<bool> CompletesWithinAsync(
+        Func<Task> step, TimeSpan timeout, Action<string> log, string name)
+    {
+        try
+        {
+            await step().WaitAsync(timeout);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            log($"  [stop] {name} timed out");
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log($"  [stop] {name} failed: {ex.Message}");
+            return false;
+        }
+    }
+
     /// <param name="mouseIntervalMs">
     /// Read per report rather than captured, so the UI can retune pacing without restarting.
     /// </param>
@@ -249,15 +279,15 @@ public static class CaptureSession
             Wake();
         };
 
-        await peripheral.RefreshHostNamesAsync();
-        capture.SetPassThrough(peripheral.IsLocalTarget);
-
         // The UI can retarget mid-session, and the hook has to stop swallowing input when it does.
         void OnTargetChanged() => capture.SetPassThrough(peripheral.IsLocalTarget);
-        peripheral.TargetChanged += OnTargetChanged;
 
         try
         {
+            await peripheral.RefreshHostNamesAsync();
+            capture.SetPassThrough(peripheral.IsLocalTarget);
+            peripheral.TargetChanged += OnTargetChanged;
+
             log($"  pointer report interval: {PointerIntervalMs()} ms");
             log($"  sending to: {peripheral.SelectedHostDisplay}");
             log("  Ctrl+Alt+CapsLock or Ctrl+D+C switches target.");
@@ -272,11 +302,14 @@ public static class CaptureSession
         {
             capture.Stop();
             peripheral.TargetChanged -= OnTargetChanged;
+
+            // In the finally so a failed start cannot leave the pump running or a key held down.
+            pumpCancellation.Cancel();
+            await CompletesWithinAsync(() => pump, ShutdownStepTimeout, log, "report pump");
+            await CompletesWithinAsync(peripheral.ReleaseKeysAsync, ShutdownStepTimeout, log, "key release");
+            await CompletesWithinAsync(peripheral.ReleaseMouseAsync, ShutdownStepTimeout, log, "mouse release");
         }
 
-        pumpCancellation.Cancel();
-        try { await pump; } catch (OperationCanceledException) { }
-        await peripheral.ReleaseKeysAsync();
         log($"  capture stopped. keyboard events={capture.KeyboardEvents}, mouse events={capture.MouseEvents}, reports sent={sent}");
         return sent;
     }
