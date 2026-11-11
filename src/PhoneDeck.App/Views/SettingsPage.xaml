@@ -1,0 +1,114 @@
+<Page x:Class="PhoneDeck.App.Views.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+      Title="Settings">
+
+  <StackPanel Margin="16,4,16,16">
+    <ui:TextBlock Text="Control how PhoneDeck starts and what happens when the window is closed."
+                  FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                  TextWrapping="Wrap" Margin="0,0,0,20" />
+
+    <ui:InfoBar x:Name="DevBar" Severity="Informational" IsClosable="False" Margin="0,0,0,16"
+                Title="Auto-start unavailable"
+                Message="Run the published executable rather than 'dotnet run' to register auto-start." />
+
+    <ui:CardControl Icon="{ui:SymbolIcon Power24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Start with Windows" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Launches hidden in the notification area when you sign in." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch x:Name="AutoStartToggle" Click="OnAutoStartChanged" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Start the peripheral automatically" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Begins advertising as soon as the app launches." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding StartPeripheralOnLaunch, Mode=TwoWay}" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon ArrowMinimize24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Keep running when the window is closed" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Paired hosts reconnect to a peripheral that never restarted, so staying resident keeps them working." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Shake the pointer to switch target" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Move the mouse rapidly back and forth to cycle between this PC and the paired hosts. Ctrl+Alt+CapsLock always works too." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch x:Name="SwitchGestureToggle" Click="OnSwitchGestureChanged" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Switch target with Ctrl+Alt+CapsLock" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Cycles between this PC and each paired device while capture stays on. Only useful with more than one device: with one phone, Ctrl+Alt+Q already switches. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding EnableCapsLockSwitch, Mode=TwoWay}" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Also switch target with Ctrl+D+C" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Can send a stray D or C to the device you are controlling. Ctrl+Alt+CapsLock always works. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding EnableCtrlDCSwitch, Mode=TwoWay}" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Reads touches on the full-screen video straight from the touchscreen and sends them to the phone, with a button bar below the video. When off, only the keyboard and mouse are captured. Same switch as on Home. Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Mode=TwoWay}" />
+    </ui:CardControl>
+
+    <ui:CardControl Icon="{ui:SymbolIcon ArrowExit20}">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Exit PhoneDeck" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Stops advertising and removes the tray icon. Hosts will need to reconnect." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:Button Content="Exit" Click="OnExit" />
+    </ui:CardControl>
+
+  </StackPanel>
+</Page>

@@ -1,3 +1,5 @@
+> **Note:** these are the developer notes of the original project, [windows-ble-hid](https://github.com/abhishek-raj/windows-ble-hid) by Abhishek Raj. Paths to the Windows projects were updated for PhoneDeck's folder names. The Android companion, the `spike` and `experiments` research folders, and the manual hardware test scripts they describe are not included in PhoneDeck; they are in the [original repository](https://github.com/abhishek-raj/windows-ble-hid).
+
 # Development guide
 
 This document records the implementation constraints, measured behavior, debugging methods,
@@ -7,14 +9,14 @@ workarounds.
 
 ## Repository layout
 
-- `src/BleHid.Core` owns the GATT peripheral, HID descriptors and reports, input capture,
+- `src/PhoneDeck.Core` owns the GATT peripheral, HID descriptors and reports, input capture,
   pacing, and diagnostics.
-- `src/BleHid.Cli` is the interactive diagnostic client and resident background process.
-- `src/BleHid.App` is the WPF desktop UI. It shares one `PeripheralService` instance for
+- `src/PhoneDeck.Cli` is the interactive diagnostic client and resident background process.
+- `src/PhoneDeck.App` is the WPF desktop UI. It shares one `PeripheralService` instance for
   the lifetime of the process.
 - `android/BleHid.Companion` is the Android 12+ companion. It owns a separate diagnostic
   GATT connection and never receives or subscribes to HID input reports.
-- `tests/BleHid.Core.Tests` contains unit tests for report encoding, paths, pacing
+- `tests/PhoneDeck.Core.Tests` contains unit tests for report encoding, paths, pacing
   configuration, key mapping, and other platform-independent behavior.
 - `experiments/bumble-hid` is a separate HOGP control peripheral and central probe built
   on Google Bumble. It is not the production implementation.
@@ -23,14 +25,14 @@ workarounds.
 There is no solution file. Build projects directly:
 
 ```powershell
-dotnet build src\BleHid.Cli\BleHid.Cli.csproj --configuration Debug
-dotnet build src\BleHid.App\BleHid.App.csproj --configuration Debug
-dotnet test tests\BleHid.Core.Tests\BleHid.Core.Tests.csproj --configuration Debug
+dotnet build src\PhoneDeck.Cli\PhoneDeck.Cli.csproj --configuration Debug
+dotnet build src\PhoneDeck.App\PhoneDeck.App.csproj --configuration Debug
+dotnet test tests\PhoneDeck.Core.Tests\PhoneDeck.Core.Tests.csproj --configuration Debug
 cd android\BleHid.Companion
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
 ```
 
-A running app locks `BleHid.Core.dll`. Stop it before rebuilding or MSBuild can retry the
+A running app locks `PhoneDeck.Core.dll`. Stop it before rebuilding or MSBuild can retry the
 copy and leave an old binary in the output directory.
 
 The projects compile against the Windows 11 build 22000 SDK so they can use connection

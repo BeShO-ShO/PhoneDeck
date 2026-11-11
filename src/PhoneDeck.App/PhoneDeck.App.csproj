@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.22000.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>PhoneDeck.App</RootNamespace>
+    <AssemblyName>PhoneDeck</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Sets the exe, taskbar and Alt+Tab icon. The tray icon is deliberately not this one:
+         it stays a monochrome glyph so it can follow the system theme. -->
+    <ApplicationIcon>Assets\phonedeck.ico</ApplicationIcon>
+    <!-- WFAC010 asks for the WinForms DPI property instead, but the manifest has to declare it:
+         the capture hook reports physical pixels and must not be virtualised. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+  <!-- Only valid when bundling, so a plain build or dotnet run is unaffected. -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PhoneDeck.Core\PhoneDeck.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Also a resource, so the title bar and tray can pick a size-appropriate frame at runtime. -->
+  <ItemGroup>
+    <Resource Include="Assets\phonedeck.ico" />
+  </ItemGroup>
+
+  <!-- WinForms is here only for the tray icon; its implicit usings collide with WPF on
+       Application, MessageBox, Color and Size. -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

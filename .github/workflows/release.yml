@@ -22,13 +22,13 @@ jobs:
 
       - name: Test
         run: >
-          dotnet test tests/BleHid.Core.Tests/BleHid.Core.Tests.csproj
+          dotnet test tests/PhoneDeck.Core.Tests/PhoneDeck.Core.Tests.csproj
           -c Release
           --logger "trx;LogFileName=results.trx"
           --results-directory TestResults
 
-      # tests/Invoke-HandoverTests.ps1 and tests/MANUAL-TESTS.md cannot run here: both need a
-      # Bluetooth radio, which GitHub-hosted runners do not have. Run them before tagging.
+      # Anything that needs a real Bluetooth radio cannot run here: GitHub-hosted runners have
+      # none. Check pairing, capture and touch on real hardware before tagging.
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -54,7 +54,7 @@ jobs:
 
       - name: Publish CLI
         run: >
-          dotnet publish src/BleHid.Cli/BleHid.Cli.csproj
+          dotnet publish src/PhoneDeck.Cli/PhoneDeck.Cli.csproj
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true
@@ -64,7 +64,7 @@ jobs:
 
       - name: Publish desktop app
         run: >
-          dotnet publish src/BleHid.App/BleHid.App.csproj
+          dotnet publish src/PhoneDeck.App/PhoneDeck.App.csproj
           -c Release
           -r ${{ matrix.rid }}
           --self-contained true
@@ -75,8 +75,8 @@ jobs:
       - name: Verify both executables are present
         run: |
           $missing = @()
-          if (-not (Test-Path "artifacts/cli/${{ matrix.rid }}/BleHid.Cli.exe")) { $missing += 'BleHid.Cli.exe' }
-          if (-not (Test-Path "artifacts/app/${{ matrix.rid }}/BleHid.App.exe")) { $missing += 'BleHid.App.exe' }
+          if (-not (Test-Path "artifacts/cli/${{ matrix.rid }}/PhoneDeck.Cli.exe")) { $missing += 'PhoneDeck.Cli.exe' }
+          if (-not (Test-Path "artifacts/app/${{ matrix.rid }}/PhoneDeck.exe")) { $missing += 'PhoneDeck.exe' }
           if ($missing) { throw "missing from the package: $($missing -join ', ')" }
 
       # Two archives because the two have different shapes: the CLI is one portable executable,
@@ -85,18 +85,18 @@ jobs:
         run: |
           Copy-Item LICENSE, README.md artifacts/cli/${{ matrix.rid }}
           Copy-Item LICENSE, README.md artifacts/app/${{ matrix.rid }}
-          Compress-Archive -Path artifacts/cli/${{ matrix.rid }}/* -DestinationPath BleHid-Cli-${{ github.ref_name }}-${{ matrix.rid }}.zip
-          Compress-Archive -Path artifacts/app/${{ matrix.rid }}/* -DestinationPath BleHid-App-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          Compress-Archive -Path artifacts/cli/${{ matrix.rid }}/* -DestinationPath PhoneDeck-Cli-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          Compress-Archive -Path artifacts/app/${{ matrix.rid }}/* -DestinationPath PhoneDeck-App-${{ github.ref_name }}-${{ matrix.rid }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: BleHid-Cli-${{ github.ref_name }}-${{ matrix.rid }}
-          path: BleHid-Cli-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          name: PhoneDeck-Cli-${{ github.ref_name }}-${{ matrix.rid }}
+          path: PhoneDeck-Cli-${{ github.ref_name }}-${{ matrix.rid }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: BleHid-App-${{ github.ref_name }}-${{ matrix.rid }}
-          path: BleHid-App-${{ github.ref_name }}-${{ matrix.rid }}.zip
+          name: PhoneDeck-App-${{ github.ref_name }}-${{ matrix.rid }}
+          path: PhoneDeck-App-${{ github.ref_name }}-${{ matrix.rid }}.zip
 
   release:
     needs: build
