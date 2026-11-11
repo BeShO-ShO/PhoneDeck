@@ -140,8 +140,9 @@ public partial class App : Application
 
             if (!AppSettings.Instance.TouchLayerEnabled) return;
 
+            // The bar's X quits outright: capture stops, keys are released, and the phone disconnects.
             _touchLayer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
-                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch);
+                ExitApplication, peripheral.LogTouch);
             _touchLayer.Show();
         }
         else if (!peripheral.IsRedirecting && _redirectUiActive)

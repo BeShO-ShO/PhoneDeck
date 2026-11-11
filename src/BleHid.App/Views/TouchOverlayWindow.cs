@@ -33,7 +33,7 @@ public sealed class TouchOverlayWindow : Window
     private bool _pumping;
 
     public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys,
-        Action stopCapture, Action<string> log)
+        Action exitApp, Action<string> log)
     {
         _send = send;
         _sendKeys = sendKeys;
@@ -47,9 +47,9 @@ public sealed class TouchOverlayWindow : Window
         ShowActivated = false;
         SizeToContent = SizeToContent.WidthAndHeight;
 
-        var stopButton = MakeButton("Stop capture", StopIcon);
+        var stopButton = MakeButton("Close BleHid", StopIcon);
         stopButton.Margin = new Thickness(32, 0, 8, 0);
-        stopButton.Click += (_, _) => stopCapture();
+        stopButton.Click += (_, _) => exitApp();
 
         Content = new StackPanel
         {
