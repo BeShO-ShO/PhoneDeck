@@ -356,7 +356,7 @@ static async Task TypeTextAsync(BleHidPeripheral peripheral, string text)
     {
         if (!HidReports.TryMapChar(character, out var usage, out var modifiers))
         {
-            Console.WriteLine($"  skipped unmappable character '{character}'");
+            Console.WriteLine("  skipped a character with no key mapping");
             continue;
         }
 

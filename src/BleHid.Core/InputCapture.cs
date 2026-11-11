@@ -416,7 +416,8 @@ public sealed class InputCapture : IDisposable
         var modifiers = CurrentModifiers();
         var usages = _pressedUsages.Take(6).ToArray();
         if (Verbose && _keyboardEvents <= 20)
-            Log?.Invoke($"  [key] vk=0x{virtualKey:x2} {(isDown ? "down" : "up")} -> mod=0x{(byte)modifiers:x2} usages=[{string.Join(" ", usages.Select(u => u.ToString("x2")))}]");
+            // Timing and counts only: key codes in a log are a record of what was typed.
+            Log?.Invoke($"  [key] {(isDown ? "down" : "up")} -> {usages.Length} key(s) held");
 
         KeyboardReport?.Invoke(modifiers, usages);
         return !releaseLocally;

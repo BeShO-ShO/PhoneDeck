@@ -125,7 +125,9 @@ public partial class App : Application
     {
         if (_exiting) return;
         _exiting = true;
-        await PeripheralService.Instance.StopAsync();
+        // A failed stop must not strand the app: _exiting is already set, so Exit would never retry.
+        try { await PeripheralService.Instance.StopAsync(); }
+        catch (Exception ex) { Report(ex); }
         Tray?.Dispose();
         // Shutdown closes windows, so it must not run inside a close that is still unwinding.
         await Dispatcher.InvokeAsync(Shutdown);
@@ -157,6 +159,7 @@ public partial class App : Application
             if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 5 * 1024 * 1024) File.Delete(LogPath);
             File.AppendAllText(LogPath, $"{DateTime.Now:s}  {ex}\n\n");
         }
-        catch (IOException) { }
+        // Runs inside the exception handlers, so a log it cannot write must not raise another.
+        catch (Exception writeError) when (writeError is IOException or UnauthorizedAccessException) { }
     }
 }

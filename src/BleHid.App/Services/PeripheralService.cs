@@ -156,7 +156,10 @@ public sealed class PeripheralService : INotifyPropertyChanged
             if (_peripheral is not null)
             {
                 _peripheral.TargetChanged -= OnTargetChanged;
-                await _peripheral.DisposeAsync();
+                _peripheral.CapsLockChanged -= OnCapsLockChanged;
+                // Cleanup below still has to run, or the app stays stuck showing a running peripheral.
+                try { await _peripheral.DisposeAsync(); }
+                catch (Exception ex) { Append($"stop error: {ex.Message}"); }
             }
             _peripheral = null;
             IsRunning = false;

@@ -20,6 +20,11 @@
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
 
+  <!-- Only valid when bundling, so a plain build or dotnet run is unaffected. -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\BleHid.Core\BleHid.Core.csproj" />
   </ItemGroup>
