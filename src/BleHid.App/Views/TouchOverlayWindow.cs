@@ -20,14 +20,16 @@ public sealed class TouchOverlayWindow : Window
 
     private readonly Func<bool, int, int, Task> _send;
     private readonly List<TouchEvent> _queue = [];
-    private readonly Button _exitButton;
+    private readonly Func<IReadOnlyList<KeyTap>, Task> _sendKeys;
+    private readonly List<Button> _buttons = [];
     private TouchDevice? _contact;
     private (int X, int Y) _lastPoint;
     private bool _pumping;
 
-    public TouchOverlayWindow(Func<bool, int, int, Task> send)
+    public TouchOverlayWindow(Func<bool, int, int, Task> send, Func<IReadOnlyList<KeyTap>, Task> sendKeys)
     {
         _send = send;
+        _sendKeys = sendKeys;
 
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -40,19 +42,53 @@ public sealed class TouchOverlayWindow : Window
         Stylus.SetIsPressAndHoldEnabled(this, false);
         Stylus.SetIsFlicksEnabled(this, false);
 
-        _exitButton = new Button
+        var exitButton = MakeButton("Exit touch (Esc)");
+        exitButton.Margin = new Thickness(8);
+        exitButton.HorizontalAlignment = HorizontalAlignment.Right;
+        exitButton.VerticalAlignment = VerticalAlignment.Top;
+        exitButton.Click += (_, _) => Close();
+
+        // Bottom centre sits in the black bar when a 16:9 video is letterboxed on a 3:2 screen.
+        var navigation = new StackPanel
         {
-            Content = "Exit touch (Esc)",
-            Padding = new Thickness(16, 10, 16, 10),
-            Margin = new Thickness(8),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Top
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 0, 16),
+            Children =
+            {
+                MakeNavigationButton("Back", PhoneNavigation.Back),
+                MakeNavigationButton("Home", PhoneNavigation.Home),
+                MakeNavigationButton("Recents", PhoneNavigation.Recents)
+            }
         };
-        _exitButton.Click += (_, _) => Close();
-        Content = new Grid { Children = { _exitButton } };
+
+        Content = new Grid { Children = { exitButton, navigation } };
 
         Loaded += (_, _) => Activate();
     }
+
+    private Button MakeButton(string text)
+    {
+        var button = new Button { Content = text, Padding = new Thickness(24, 12, 24, 12) };
+        _buttons.Add(button);
+        return button;
+    }
+
+    private Button MakeNavigationButton(string text, KeyTap[] taps)
+    {
+        var button = MakeButton(text);
+        button.Margin = new Thickness(8, 0, 8, 0);
+        button.Click += async (_, _) =>
+        {
+            try { await _sendKeys(taps); }
+            catch (Exception) { /* A dropped link should not take the app down. */ }
+        };
+        return button;
+    }
+
+    private bool IsOverButton(TouchEventArgs e) =>
+        _buttons.Any(button => button.InputHitTest(e.GetTouchPoint(button).Position) is not null);
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -64,7 +100,7 @@ public sealed class TouchOverlayWindow : Window
     {
         base.OnTouchDown(e);
         // Left unhandled so the button still receives its tap as a click.
-        if (_exitButton.InputHitTest(e.GetTouchPoint(_exitButton).Position) is not null) return;
+        if (IsOverButton(e)) return;
 
         e.Handled = true;
         if (_contact is not null) return; // One finger only in this experiment.

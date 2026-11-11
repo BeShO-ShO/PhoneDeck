@@ -117,6 +117,19 @@ public sealed class PeripheralService : INotifyPropertyChanged
     public Task SendTouchAsync(bool down, int x, int y) =>
         _peripheral?.SendTouchAsync(down, x, y) ?? Task.CompletedTask;
 
+    public async Task SendKeyTapsAsync(IReadOnlyList<KeyTap> taps)
+    {
+        if (_peripheral is not { } peripheral) return;
+
+        foreach (var tap in taps)
+        {
+            await peripheral.SendKeyboardAsync(tap.Modifiers, tap.Usage);
+            await Task.Delay(40);
+            await peripheral.ReleaseKeysAsync();
+            await Task.Delay(40);
+        }
+    }
+
     /// <summary>Capture needs a subscribed host, so it stays disabled until one appears.</summary>
     public bool CanCapture => IsRunning && KeyboardSubscribers > 0;
 

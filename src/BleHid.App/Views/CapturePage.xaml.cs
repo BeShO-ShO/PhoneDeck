@@ -40,7 +40,7 @@ public partial class CapturePage : Page
         }
 
         // This window would otherwise sit between the see-through layer and the video.
-        var overlay = new TouchOverlayWindow(_service.SendTouchAsync);
+        var overlay = new TouchOverlayWindow(_service.SendTouchAsync, _service.SendKeyTapsAsync);
         overlay.Closed += (_, _) => App.Current.ShowMainWindow();
         App.Current.MainWindow?.Hide();
         overlay.Show();

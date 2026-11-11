@@ -45,6 +45,19 @@ public sealed class TouchInputTests
     }
 
     [Fact]
+    public void Back_is_a_plain_escape_press()
+    {
+        Assert.Equal([new KeyTap(KeyModifiers.None, 0x29)], PhoneNavigation.Back);
+    }
+
+    [Fact]
+    public void Home_and_recents_are_sent_with_the_meta_key()
+    {
+        Assert.All(PhoneNavigation.Home, tap => Assert.Equal(KeyModifiers.LeftGui, tap.Modifiers));
+        Assert.All(PhoneNavigation.Recents, tap => Assert.Equal(KeyModifiers.LeftGui, tap.Modifiers));
+    }
+
+    [Fact]
     public void Touch_report_id_is_distinct()
     {
         Assert.NotEqual(HidDescriptors.KeyboardReportId, HidDescriptors.TouchReportId);
