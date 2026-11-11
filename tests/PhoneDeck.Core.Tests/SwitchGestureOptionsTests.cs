@@ -5,6 +5,27 @@ namespace PhoneDeck.Core.Tests;
 
 public sealed class SwitchGestureOptionsTests
 {
+    /// <summary>
+    /// A watcher can still be reading the file for a last change notification when a test ends,
+    /// and Windows refuses to delete a file that is open. That is a cleanup race, not a failure
+    /// of the code under test, so cleanup retries briefly instead of failing the test.
+    /// </summary>
+    private static void DeleteTestFile(string path)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) when (attempt < 20)
+            {
+                Thread.Sleep(50);
+            }
+        }
+    }
+
     [Fact]
     public void A_missing_file_leaves_the_gesture_disabled_without_complaining()
     {
@@ -30,7 +51,7 @@ public sealed class SwitchGestureOptionsTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteTestFile(path);
         }
     }
 
@@ -120,7 +141,7 @@ public sealed class SwitchGestureOptionsTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteTestFile(path);
         }
     }
 
@@ -163,7 +184,7 @@ public sealed class SwitchGestureOptionsTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteTestFile(path);
         }
     }
 
@@ -186,7 +207,7 @@ public sealed class SwitchGestureOptionsTests
         }
         finally
         {
-            File.Delete(path);
+            DeleteTestFile(path);
         }
     }
 }
