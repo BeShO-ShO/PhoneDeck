@@ -130,6 +130,22 @@ public sealed class BleHidPeripheral : IAsyncDisposable
             ? GattProtectionLevel.EncryptionRequired
             : GattProtectionLevel.Plain;
 
+    /// <summary>
+    /// Runs a GATT request handler. They are async void by nature, so anything thrown would end
+    /// the process; replying after the host has disconnected (RO_E_CLOSED) did exactly that.
+    /// </summary>
+    private async void Safely(Func<Task> handler)
+    {
+        try
+        {
+            await handler();
+        }
+        catch (Exception ex)
+        {
+            Log?.Invoke($"[gatt] request abandoned: {ex.Message}");
+        }
+    }
+
     private void Record(string step, string detail, bool ok)
     {
         _diagnostics.Add(new PeripheralDiagnostics(step, detail, ok));
@@ -234,13 +250,13 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         Record(name, $"{result.Error} ({value.Length} bytes)", result.Error == BluetoothError.Success);
         if (result.Error != BluetoothError.Success) return;
 
-        result.Characteristic.ReadRequested += async (_, args) =>
+        result.Characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             Log?.Invoke($"[read] host read {name}");
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray(value));
-        };
+        });
     }
 
     private async Task CreateBatteryServiceAsync()
@@ -264,13 +280,13 @@ public sealed class BleHidPeripheral : IAsyncDisposable
             levelResult.Error == BluetoothError.Success);
         if (levelResult.Error != BluetoothError.Success) return;
 
-        levelResult.Characteristic.ReadRequested += async (_, args) =>
+        levelResult.Characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             Log?.Invoke("[read] host read Battery Level");
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray([100]));
-        };
+        });
     }
 
     private async Task CreateControlPointAsync(GattLocalService service)
@@ -285,13 +301,13 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         Record("HID Control Point", result.Error.ToString(), result.Error == BluetoothError.Success);
         if (result.Error != BluetoothError.Success) return;
 
-        result.Characteristic.WriteRequested += async (_, args) =>
+        result.Characteristic.WriteRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             var command = ReadBytes(request.Value);
             Log?.Invoke($"[hid ] control point <- 0x{(command.Length > 0 ? command[0] : 0):X2}");
-        };
+        });
     }
 
     private async Task CreateProtocolModeAsync(GattLocalService service)
@@ -308,21 +324,21 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         Record("Protocol Mode", result.Error.ToString(), result.Error == BluetoothError.Success);
         if (result.Error != BluetoothError.Success) return;
 
-        result.Characteristic.ReadRequested += async (_, args) =>
+        result.Characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray([_protocolMode]));
-        };
+        });
 
-        result.Characteristic.WriteRequested += async (_, args) =>
+        result.Characteristic.WriteRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             var value = ReadBytes(request.Value);
             if (value.Length > 0) _protocolMode = value[0];
             Log?.Invoke($"[hid ] protocol mode -> {(_protocolMode == 0 ? "boot" : "report")}");
-        };
+        });
     }
 
     private async Task CreateOutputReportAsync(GattLocalService service, byte reportId)
@@ -342,7 +358,7 @@ public sealed class BleHidPeripheral : IAsyncDisposable
 
         var characteristic = result.Characteristic;
 
-        characteristic.ReadRequested += async (_, args) =>
+        characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
@@ -350,16 +366,16 @@ public sealed class BleHidPeripheral : IAsyncDisposable
             // byte would hand whichever host asked the lamp state of whichever wrote last.
             var leds = (byte)LockKeysFor(args.Session.DeviceId.Id);
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray([leds]));
-        };
+        });
 
-        characteristic.WriteRequested += async (_, args) =>
+        characteristic.WriteRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             var value = ReadBytes(request.Value);
             if (value.Length > 0) NoteLedReport(args.Session.DeviceId.Id, value[0]);
             if (request.Option == GattWriteOption.WriteWithResponse) request.Respond();
-        };
+        });
 
         var descriptorParameters = new GattLocalDescriptorParameters
         {
@@ -395,21 +411,21 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         var characteristic = result.Characteristic;
         var certificate = new byte[HidDescriptors.TouchCertificateLength];
 
-        characteristic.ReadRequested += async (_, args) =>
+        characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             Log?.Invoke($"[read] host read touch certificate at offset {request.Offset}");
             var offset = (int)Math.Min(request.Offset, (uint)certificate.Length);
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray(certificate[offset..]));
-        };
+        });
 
-        characteristic.WriteRequested += async (_, args) =>
+        characteristic.WriteRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             if (request.Option == GattWriteOption.WriteWithResponse) request.Respond();
-        };
+        });
 
         var descriptorParameters = new GattLocalDescriptorParameters
         {
@@ -459,18 +475,26 @@ public sealed class BleHidPeripheral : IAsyncDisposable
 
         var characteristic = result.Characteristic;
 
-        characteristic.ReadRequested += async (_, args) =>
+        characteristic.ReadRequested += (_, args) => Safely(async () =>
         {
             using var deferral = args.GetDeferral();
             var request = await args.GetRequestAsync();
             Log?.Invoke($"[read] host read {name}");
             request.RespondWithValue(CryptographicBuffer.CreateFromByteArray(currentValue()));
-        };
+        });
 
         characteristic.SubscribedClientsChanged += (sender, _) =>
         {
-            Log?.Invoke($"[subs] {name}: {sender.SubscribedClients.Count} subscriber(s)");
-            ReturnLocalIfTargetUnavailable();
+            // Raised on a WinRT thread as a host connects or drops, when its session may already be gone.
+            try
+            {
+                Log?.Invoke($"[subs] {name}: {sender.SubscribedClients.Count} subscriber(s)");
+                ReturnLocalIfTargetUnavailable();
+            }
+            catch (Exception ex)
+            {
+                Log?.Invoke($"[subs] {name}: could not read subscribers: {ex.Message}");
+            }
             _ = RefreshConnectionParametersAsync();
         };
 

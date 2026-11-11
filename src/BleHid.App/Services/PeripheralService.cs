@@ -116,6 +116,11 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
     public void LogTouch(string message) => Append($"[touch] {message}");
 
+    public void LogApp(string message) => Append($"[app ] {message}");
+
+    /// <summary>When capture last ended, so the key that ended it cannot immediately restart it.</summary>
+    public long CaptureEndedAt { get; private set; }
+
     public async Task SendKeyTapsAsync(IReadOnlyList<KeyTap> taps)
     {
         if (_peripheral is not { } peripheral) return;
@@ -373,6 +378,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
             {
                 await _dispatcher.InvokeAsync(() =>
                 {
+                    CaptureEndedAt = Environment.TickCount64;
                     IsCapturing = false;
                     SyncTargetState();
                     SyncSelection();

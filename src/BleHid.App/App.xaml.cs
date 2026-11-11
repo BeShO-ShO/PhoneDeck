@@ -17,6 +17,7 @@ public partial class App : Application
     private RegisteredWaitHandle? _stopRegistration;
     private bool _exiting;
     private TouchOverlayWindow? _touchLayer;
+    private CaptureHotkey? _captureHotkey;
     private bool _redirectUiActive;
     private bool _restoreWindowAfterRedirect;
 
@@ -49,6 +50,7 @@ public partial class App : Application
         base.OnStartup(e);
 
         Tray = new TrayIconService(ShowMainWindow, ExitApplication);
+        _captureHotkey = new CaptureHotkey(OnCaptureHotkey, PeripheralService.Instance.LogApp);
 
         // The tray is the only surface visible while the window is hidden, which is exactly when
         // a lock left on a remote host would otherwise go unnoticed.
@@ -154,6 +156,23 @@ public partial class App : Application
         }
     }
 
+    /// <summary>Ctrl+Alt+Q while capture is off: the keyboard hook handles it while capture is on.</summary>
+    private void OnCaptureHotkey()
+    {
+        var peripheral = PeripheralService.Instance;
+        if (_exiting || peripheral.IsCapturing) return;
+        // Belt and braces with no-repeat: the press that just ended capture must not restart it.
+        if (Environment.TickCount64 - peripheral.CaptureEndedAt < 750) return;
+
+        if (!peripheral.CanCapture)
+        {
+            Tray?.ShowMessage("No phone connected. Tap Connect for this PC in the phone's Bluetooth settings.");
+            return;
+        }
+
+        _ = peripheral.StartCaptureAsync();
+    }
+
     public void ShowMainWindow()
     {
         MainWindow ??= new MainWindow();
@@ -170,6 +189,7 @@ public partial class App : Application
         try { await PeripheralService.Instance.StopAsync(); }
         catch (Exception ex) { Report(ex); }
         Tray?.Dispose();
+        _captureHotkey?.Dispose();
         // Shutdown closes windows, so it must not run inside a close that is still unwinding.
         await Dispatcher.InvokeAsync(Shutdown);
     }

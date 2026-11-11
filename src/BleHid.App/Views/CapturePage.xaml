@@ -124,7 +124,7 @@
 
       <ui:CardControl Icon="{ui:SymbolIcon Dismiss24}">
         <ui:CardControl.Header>
-          <ui:TextBlock Text="Stop capture" FontTypography="BodyStrong" />
+          <ui:TextBlock Text="Turn capture on or off" FontTypography="BodyStrong" />
         </ui:CardControl.Header>
         <ui:TextBlock Text="Ctrl + Alt + Q" FontFamily="Cascadia Mono, Consolas"
                       FontTypography="Body" />
