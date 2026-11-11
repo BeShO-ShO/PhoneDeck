@@ -17,6 +17,7 @@ public static class HidDescriptors
 
     public const byte KeyboardReportId = 1;
     public const byte MouseReportId    = 2;
+    public const byte TouchReportId    = 3;
 
     public const byte ReportTypeInput  = 1;
     public const byte ReportTypeOutput = 2;
@@ -109,6 +110,47 @@ public static class HidDescriptors
         0x95, 0x01,       //     Report Count (1)
         0x81, 0x06,       //     Input (Data,Var,Rel) - wheel
         0xC0,             //   End Collection
+        0xC0,             // End Collection
+
+        // ---- Touch screen, one contact (Report ID 3) ----
+        // Contact Identifier is what makes Linux bind its multitouch driver, which is what marks
+        // the device as a direct touchscreen rather than a pointer.
+        0x05, 0x0D,       // Usage Page (Digitizer)
+        0x09, 0x04,       // Usage (Touch Screen)
+        0xA1, 0x01,       // Collection (Application)
+        0x85, TouchReportId,
+        0x09, 0x22,       //   Usage (Finger)
+        0xA1, 0x02,       //   Collection (Logical)
+        0x09, 0x42,       //     Usage (Tip Switch)
+        0x09, 0x32,       //     Usage (In Range)
+        0x15, 0x00,       //     Logical Minimum (0)
+        0x25, 0x01,       //     Logical Maximum (1)
+        0x75, 0x01,       //     Report Size (1)
+        0x95, 0x02,       //     Report Count (2)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - tip, in range
+        0x95, 0x06,       //     Report Count (6)
+        0x81, 0x01,       //     Input (Const)        - padding
+        0x09, 0x51,       //     Usage (Contact Identifier)
+        0x25, 0x7F,       //     Logical Maximum (127)
+        0x75, 0x08,       //     Report Size (8)
+        0x95, 0x01,       //     Report Count (1)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - contact id
+        0x05, 0x01,       //     Usage Page (Generic Desktop)
+        0x09, 0x30,       //     Usage (X)
+        0x09, 0x31,       //     Usage (Y)
+        0x15, 0x00,       //     Logical Minimum (0)
+        0x26, 0xFF, 0x7F, //     Logical Maximum (32767)
+        0x75, 0x10,       //     Report Size (16)
+        0x95, 0x02,       //     Report Count (2)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - x, y
+        0xC0,             //   End Collection
+        0x05, 0x0D,       //   Usage Page (Digitizer)
+        0x09, 0x54,       //   Usage (Contact Count)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x7F,       //   Logical Maximum (127)
+        0x75, 0x08,       //   Report Size (8)
+        0x95, 0x01,       //   Report Count (1)
+        0x81, 0x02,       //   Input (Data,Var,Abs) - contact count
         0xC0              // End Collection
     ];
 }

@@ -46,8 +46,10 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     private GattServiceProvider? _batteryProvider;
     private GattLocalCharacteristic? _keyboardInput;
     private GattLocalCharacteristic? _mouseInput;
+    private GattLocalCharacteristic? _touchInput;
     private byte[] _lastKeyboardReport = new byte[HidReports.KeyboardReportLength];
     private byte[] _lastMouseReport = new byte[HidReports.MouseReportLength];
+    private byte[] _lastTouchReport = new byte[HidReports.TouchReportLength];
     private const byte CapsLockUsage = 0x39;
     private const byte NumLockUsage = 0x53;
     // Keypad / through Keypad . - the keys whose meaning Num Lock actually changes.
@@ -174,6 +176,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
 
         _mouseInput = await CreateInputReportAsync("Mouse input report", service,
             HidDescriptors.MouseReportId, () => _lastMouseReport);
+
+        _touchInput = await CreateInputReportAsync("Touch input report", service,
+            HidDescriptors.TouchReportId, () => _lastTouchReport);
 
         await CreateBatteryServiceAsync();
 
@@ -661,6 +666,12 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     }
 
     public Task ReleaseMouseAsync() => SendMouseAsync(MouseButtons.None, 0, 0, 0);
+
+    public Task SendTouchAsync(bool down, int x, int y)
+    {
+        _lastTouchReport = HidReports.Touch(down, x, y);
+        return NotifyAsync(_touchInput, _lastTouchReport);
+    }
 
     /// <summary>Subscribed hosts, de-duplicated across the keyboard and mouse reports.</summary>
     public IReadOnlyList<HostTarget> Hosts()

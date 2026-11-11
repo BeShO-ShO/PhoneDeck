@@ -44,6 +44,24 @@ public static class HidReports
 {
     public const int KeyboardReportLength = 8;
     public const int MouseReportLength    = 6;
+    public const int TouchReportLength    = 7;
+    public const int TouchLogicalMax      = 32767;
+
+    /// <summary>One contact: flags, contact id, X, Y, contact count.</summary>
+    public static byte[] Touch(bool down, int x, int y)
+    {
+        var clampedX = Math.Clamp(x, 0, TouchLogicalMax);
+        var clampedY = Math.Clamp(y, 0, TouchLogicalMax);
+        return
+        [
+            (byte)(down ? 0x03 : 0x00), // tip switch + in range
+            0x00,
+            (byte)(clampedX & 0xFF), (byte)((clampedX >> 8) & 0xFF),
+            (byte)(clampedY & 0xFF), (byte)((clampedY >> 8) & 0xFF),
+            0x01
+        ];
+    }
+
     public static byte[] Keyboard(KeyModifiers modifiers, params byte[] usages)
     {
         var report = new byte[KeyboardReportLength];

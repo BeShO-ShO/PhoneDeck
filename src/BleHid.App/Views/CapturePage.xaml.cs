@@ -30,6 +30,22 @@ public partial class CapturePage : Page
         if (((FrameworkElement)sender).DataContext is TargetOption option) _service.Select(option);
     }
 
+    private void OnOpenTouchLayer(object sender, RoutedEventArgs e)
+    {
+        if (!_service.CanUseTouch)
+        {
+            MessageBox.Show("Connect your phone, select it under Send input to, and turn capture off first.",
+                "BLE HID", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // This window would otherwise sit between the see-through layer and the video.
+        var overlay = new TouchOverlayWindow(_service.SendTouchAsync);
+        overlay.Closed += (_, _) => App.Current.ShowMainWindow();
+        App.Current.MainWindow?.Hide();
+        overlay.Show();
+    }
+
     private async void OnToggleCapture(object sender, RoutedEventArgs e)
     {
         if (_service.IsCapturing) await _service.StopCaptureAsync();
