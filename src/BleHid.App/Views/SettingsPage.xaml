@@ -77,10 +77,10 @@
     <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
       <ui:CardControl.Header>
         <StackPanel>
-          <ui:TextBlock Text="Touch layer during capture" FontTypography="BodyStrong" />
+          <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Sends touches on the video to the phone. When off, only the keyboard and mouse are captured. Press Ctrl+Alt+Q to stop capture. Applies the next time capture starts." />
+                        Text="Reads touches on the full-screen video straight from the touchscreen and sends them to the phone, with a button bar below the video. When off, only the keyboard and mouse are captured. Same switch as on Home. Applies the next time capture starts." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Mode=TwoWay}" />
