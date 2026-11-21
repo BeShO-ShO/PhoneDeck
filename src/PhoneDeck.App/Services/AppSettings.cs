@@ -59,6 +59,45 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _touchLayerEnabled, value)) Save(); }
     }
 
+    private bool _openViewerWithCapture = true;
+
+    /// <summary>Whether starting capture also opens mpv on <see cref="ViewerVideoDevice"/>.</summary>
+    public bool OpenViewerWithCapture
+    {
+        get => _openViewerWithCapture;
+        set { if (Set(ref _openViewerWithCapture, value)) Save(); }
+    }
+
+    private string? _viewerVideoDevice;
+
+    /// <summary>
+    /// The capture device mpv shows. When set, starting capture also opens mpv on it if it is
+    /// not already open. Empty means PhoneDeck leaves mpv to you.
+    /// </summary>
+    public string? ViewerVideoDevice
+    {
+        get => _viewerVideoDevice;
+        set { if (Set(ref _viewerVideoDevice, string.IsNullOrWhiteSpace(value) ? null : value.Trim())) Save(); }
+    }
+
+    private string? _viewerAudioDevice;
+
+    /// <summary>The capture device's sound input, or empty for no sound (lowest delay).</summary>
+    public string? ViewerAudioDevice
+    {
+        get => _viewerAudioDevice;
+        set { if (Set(ref _viewerAudioDevice, string.IsNullOrWhiteSpace(value) ? null : value.Trim())) Save(); }
+    }
+
+    private string? _mpvPath;
+
+    /// <summary>Full path to mpv.exe; empty means find it on PATH or in Program Files.</summary>
+    public string? MpvPath
+    {
+        get => _mpvPath;
+        set { if (Set(ref _mpvPath, string.IsNullOrWhiteSpace(value) ? null : value.Trim().Trim('"'))) Save(); }
+    }
+
     private string? _lastHostId;
 
     /// <summary>The host last chosen as the target, reselected when it reconnects after a restart.</summary>

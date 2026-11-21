@@ -98,13 +98,25 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
+    <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Starts mpv with capture. Device in Settings." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ui:ToggleSwitch IsChecked="{Binding OpenViewerWithCapture, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+    </ui:CardControl>
+
     <ui:CardControl Icon="{ui:SymbolIcon Cursor24}">
       <ui:CardControl.Header>
         <StackPanel>
           <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Touches on the full-screen video go to the phone, with a button bar below it. Applies the next time capture starts." />
+                        Text="Touch and pen on the video go to the phone." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />

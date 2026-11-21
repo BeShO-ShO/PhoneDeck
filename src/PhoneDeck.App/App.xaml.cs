@@ -140,12 +140,17 @@ public partial class App : Application
             _restoreWindowAfterRedirect = MainWindow?.IsVisible == true;
             MainWindow?.Hide();
 
+            // mpv stays open when capture stops, so the phone can still be watched; it closes
+            // with PhoneDeck.
+            if (ViewerService.Instance.EnsureRunning(peripheral.LogApp) is { } problem) Tray?.ShowMessage(problem);
+
             if (!AppSettings.Instance.TouchLayerEnabled) return;
 
             // The bar's X matches Ctrl+Alt+Q: capture stops but PhoneDeck keeps running, so the same
             // keys turn it straight back on.
-            _touchLayer = new TouchOverlayWindow(peripheral.SendTouchAsync, peripheral.SendKeyTapsAsync,
-                () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch, peripheral.Target);
+            _touchLayer = new TouchOverlayWindow(peripheral.SendTouchFrameAsync, peripheral.SendPenAsync,
+                peripheral.SendKeyTapsAsync, () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch,
+                peripheral.Target, () => ViewerService.Instance.ProcessId);
             _touchLayer.Show();
         }
         else if (!peripheral.IsRedirecting && _redirectUiActive)
@@ -191,6 +196,7 @@ public partial class App : Application
         catch (Exception ex) { Report(ex); }
         Tray?.Dispose();
         _captureHotkey?.Dispose();
+        ViewerService.Instance.Stop();
         // Shutdown closes windows, so it must not run inside a close that is still unwinding.
         await Dispatcher.InvokeAsync(Shutdown);
     }

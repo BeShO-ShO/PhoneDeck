@@ -86,21 +86,17 @@ public sealed class TouchFrameAssemblerTests
     }
 
     [Fact]
-    public void Lost_finger_no_longer_freezes_the_tracker()
+    public void Lost_finger_is_lifted_on_the_phone_and_the_next_one_works()
     {
-        var tracker = new SingleTouchTracker();
-        void Feed(int? count, params RawContact[] slots)
-        {
-            foreach (var contact in _frames.Add(count, slots))
-                tracker.Update(contact.Id, contact.Touching, contact.X, contact.Y, true);
-        }
+        var tracker = new MultiTouchTracker();
+        static bool OnVideo(double x, double y) => true;
 
-        Feed(1, Down(1));
+        tracker.Update(_frames.Add(1, [Down(1)]), OnVideo);
         // Finger 1 vanishes without a release. Finger 2 lands, then moves.
-        Feed(1, Down(2, 10, 10));
+        var landed = tracker.Update(_frames.Add(1, [Down(2, 10, 10)]), OnVideo);
+        var moved = tracker.Update(_frames.Add(1, [Down(2, 20, 20)]), OnVideo);
 
-        var moved = _frames.Add(1, [Down(2, 20, 20)]).Single();
-
-        Assert.Equal(TouchPhase.Move, tracker.Update(moved.Id, moved.Touching, moved.X, moved.Y, true)?.Phase);
+        Assert.Equal([new TrackedContact(1, true, 10, 10), new TrackedContact(0, false, 1, 2)], landed);
+        Assert.Equal([new TrackedContact(1, true, 20, 20)], moved);
     }
 }

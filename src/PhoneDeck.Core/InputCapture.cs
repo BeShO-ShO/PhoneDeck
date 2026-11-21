@@ -533,8 +533,7 @@ public sealed class InputCapture : IDisposable
         if (IsTouchPromoted(data.dwExtraInfo))
         {
             // Outside the video it stays a normal tap, which is how the button bar gets its clicks.
-            if (_touchGoesToHost && !_passThrough && TouchMapper.IsInsideVideo(data.pt.x, data.pt.y,
-                    GetSystemMetrics(0), GetSystemMetrics(1), TouchMapper.DefaultVideoAspect))
+            if (_touchGoesToHost && !_passThrough && VideoRegion.IsOnVideo(data.pt.x, data.pt.y))
                 return 1;
 
             // It moves the real cursor off centre, so the next real delta would be a huge jump.

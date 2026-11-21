@@ -36,6 +36,23 @@ public enum LockKeys : byte
     CapsLock = 0x02
 }
 
+/// <summary>Pen state bits, in the order the pen collection declares them.</summary>
+[Flags]
+public enum PenFlags : byte
+{
+    None    = 0x00,
+    Tip     = 0x01,
+    Barrel  = 0x02,
+    /// <summary>The eraser end is the one near the screen.</summary>
+    Invert  = 0x04,
+    /// <summary>The eraser end is pressed on the screen.</summary>
+    Eraser  = 0x08,
+    InRange = 0x10
+}
+
+/// <summary>One finger in a touch frame, in touch logical units.</summary>
+public readonly record struct TouchPoint(int ContactId, bool Down, int X, int Y);
+
 /// <summary>
 /// Builds HID input report payloads. In HOGP report-protocol mode the Report ID is
 /// conveyed by the characteristic's Report Reference descriptor, not the payload.
@@ -45,20 +62,61 @@ public static class HidReports
     public const int KeyboardReportLength = 8;
     public const int MouseReportLength    = 6;
     public const int TouchReportLength    = 7;
+    public const int PenReportLength      = 7;
     public const int TouchLogicalMax      = 32767;
+    public const int PenPressureMax       = 4095;
+
+    /// <summary>
+    /// The touch report carries one finger, so a frame of several fingers goes out as several
+    /// reports ("hybrid" mode): the first says how many fingers the frame has, the rest say 0,
+    /// and the host waits for them all before it updates the screen.
+    /// </summary>
+    public const int MaxTouchContacts = 5;
 
     /// <summary>One contact: flags, contact id, X, Y, contact count.</summary>
-    public static byte[] Touch(bool down, int x, int y)
+    public static byte[] Touch(bool down, int x, int y) => Touch(down, 0, x, y, 1);
+
+    /// <summary>One contact of a frame. <paramref name="contactCount"/> is the frame size on its
+    /// first report and 0 on the ones that follow.</summary>
+    public static byte[] Touch(bool down, int contactId, int x, int y, int contactCount)
     {
         var clampedX = Math.Clamp(x, 0, TouchLogicalMax);
         var clampedY = Math.Clamp(y, 0, TouchLogicalMax);
         return
         [
             (byte)(down ? 0x03 : 0x00), // tip switch + in range
-            0x00,
+            (byte)Math.Clamp(contactId, 0, 127),
             (byte)(clampedX & 0xFF), (byte)((clampedX >> 8) & 0xFF),
             (byte)(clampedY & 0xFF), (byte)((clampedY >> 8) & 0xFF),
-            0x01
+            (byte)Math.Clamp(contactCount, 0, 127)
+        ];
+    }
+
+    /// <summary>The reports for one frame: every finger down plus any lifting in this frame.</summary>
+    public static List<byte[]> TouchFrame(IReadOnlyList<TouchPoint> contacts)
+    {
+        var reports = new List<byte[]>(contacts.Count);
+        for (var i = 0; i < contacts.Count; i++)
+        {
+            var contact = contacts[i];
+            reports.Add(Touch(contact.Down, contact.ContactId, contact.X, contact.Y, i == 0 ? contacts.Count : 0));
+        }
+        return reports;
+    }
+
+    /// <summary>Pen: state bits, X, Y, tip pressure.</summary>
+    public static byte[] Pen(PenFlags flags, int x, int y, int pressure)
+    {
+        var clampedX = Math.Clamp(x, 0, TouchLogicalMax);
+        var clampedY = Math.Clamp(y, 0, TouchLogicalMax);
+        var touching = (flags & (PenFlags.Tip | PenFlags.Eraser)) != 0;
+        var clampedPressure = touching ? Math.Clamp(pressure, 0, PenPressureMax) : 0;
+        return
+        [
+            (byte)flags,
+            (byte)(clampedX & 0xFF), (byte)((clampedX >> 8) & 0xFF),
+            (byte)(clampedY & 0xFF), (byte)((clampedY >> 8) & 0xFF),
+            (byte)(clampedPressure & 0xFF), (byte)((clampedPressure >> 8) & 0xFF)
         ];
     }
 

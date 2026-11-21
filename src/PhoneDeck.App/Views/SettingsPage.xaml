@@ -92,11 +92,38 @@
           <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Reads touches on the full-screen video straight from the touchscreen and sends them to the phone, with a button bar below the video. When off, only the keyboard and mouse are captured. Same switch as on Home. Applies the next time capture starts." />
+                        Text="Touch and pen on the video go to the phone, with a button bar below it. Same switch as on Home." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Mode=TwoWay}" />
     </ui:CardControl>
+
+    <ui:Card Margin="0,0,0,8" Padding="16,12,16,16">
+      <StackPanel>
+        <ui:TextBlock Text="Phone's screen (mpv)" FontTypography="BodyStrong" />
+        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,2,0,12"
+                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                      Text="Opened with capture when the switch on Home is on." />
+
+        <ui:TextBlock Text="Video" FontTypography="Caption" Margin="0,0,0,4" />
+        <ComboBox x:Name="VideoDeviceBox" IsEditable="True" Margin="0,0,0,10"
+                  Text="{Binding ViewerVideoDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <ui:TextBlock Text="Sound (empty for none, least delay)" FontTypography="Caption" Margin="0,0,0,4" />
+        <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,10"
+                  Text="{Binding ViewerAudioDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <ui:TextBlock Text="mpv.exe" FontTypography="Caption" Margin="0,0,0,4" />
+        <ui:TextBox x:Name="MpvPathBox" Margin="0,0,0,10"
+                    Text="{Binding MpvPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+
+        <StackPanel Orientation="Horizontal">
+          <ui:Button Content="Open now" Click="OnOpenViewer" />
+          <ui:TextBlock x:Name="ViewerStatus" FontTypography="Caption" VerticalAlignment="Center" Margin="12,0,0,0"
+                        TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+      </StackPanel>
+    </ui:Card>
 
     <ui:CardControl Icon="{ui:SymbolIcon ArrowExit20}">
       <ui:CardControl.Header>

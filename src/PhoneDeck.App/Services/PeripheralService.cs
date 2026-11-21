@@ -122,8 +122,11 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
     public bool HasTargetLockWarning => TargetLockWarning is not null;
 
-    public Task SendTouchAsync(bool down, int x, int y) =>
-        _peripheral?.SendTouchAsync(down, x, y) ?? Task.CompletedTask;
+    public Task SendTouchFrameAsync(IReadOnlyList<TouchPoint> contacts) =>
+        _peripheral?.SendTouchFrameAsync(contacts) ?? Task.CompletedTask;
+
+    public Task SendPenAsync(PenFlags flags, int x, int y, int pressure) =>
+        _peripheral?.SendPenAsync(flags, x, y, pressure) ?? Task.CompletedTask;
 
     public void LogTouch(string message) => Append($"[touch] {message}");
 

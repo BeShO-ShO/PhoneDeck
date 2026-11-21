@@ -50,6 +50,8 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     private byte[] _lastKeyboardReport = new byte[HidReports.KeyboardReportLength];
     private byte[] _lastMouseReport = new byte[HidReports.MouseReportLength];
     private byte[] _lastTouchReport = new byte[HidReports.TouchReportLength];
+    private GattLocalCharacteristic? _penInput;
+    private byte[] _lastPenReport = new byte[HidReports.PenReportLength];
     private const byte CapsLockUsage = 0x39;
     private const byte NumLockUsage = 0x53;
     // Keypad / through Keypad . - the keys whose meaning Num Lock actually changes.
@@ -204,6 +206,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
             HidDescriptors.TouchReportId, () => _lastTouchReport);
 
         await CreateTouchCertificateReportAsync(service);
+
+        _penInput = await CreateInputReportAsync("Pen input report", service,
+            HidDescriptors.PenReportId, () => _lastPenReport);
 
         await CreateBatteryServiceAsync();
 
@@ -755,6 +760,22 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     {
         _lastTouchReport = HidReports.Touch(down, x, y);
         return NotifyAsync(_touchInput, _lastTouchReport);
+    }
+
+    /// <summary>Sends one touch frame as back-to-back reports; see <see cref="HidReports.TouchFrame"/>.</summary>
+    public async Task SendTouchFrameAsync(IReadOnlyList<TouchPoint> contacts)
+    {
+        foreach (var report in HidReports.TouchFrame(contacts))
+        {
+            _lastTouchReport = report;
+            await NotifyAsync(_touchInput, report);
+        }
+    }
+
+    public Task SendPenAsync(PenFlags flags, int x, int y, int pressure)
+    {
+        _lastPenReport = HidReports.Pen(flags, x, y, pressure);
+        return NotifyAsync(_penInput, _lastPenReport);
     }
 
     /// <summary>Subscribed hosts, de-duplicated across the keyboard and mouse reports.</summary>

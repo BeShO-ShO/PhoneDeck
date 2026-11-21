@@ -6,9 +6,9 @@ using PhoneDeck.Core;
 namespace PhoneDeck.App.Services;
 
 /// <summary>
-/// Reads the touchscreen's own HID reports through Raw Input. Unlike touch events this needs no
-/// window under the finger, so nothing has to cover the video: a full-screen see-through window
-/// was measurably slowing the pointer down.
+/// Reads the touchscreen's and the pen's own HID reports through Raw Input. Unlike touch events
+/// this needs no window under the finger, so nothing has to cover the video: a full-screen
+/// see-through window was measurably slowing the pointer down.
 /// </summary>
 public sealed class RawTouchReader : IDisposable
 {
@@ -19,8 +19,14 @@ public sealed class RawTouchReader : IDisposable
     private const uint RIDI_PREPARSEDDATA = 0x20000005;
     private const uint RIM_TYPEHID = 2;
     private const ushort DigitizerPage = 0x0D;
+    private const ushort PenUsage = 0x02;
     private const ushort TouchScreenUsage = 0x04;
+    private const ushort TipPressureUsage = 0x30;
+    private const ushort InRangeUsage = 0x32;
+    private const ushort InvertUsage = 0x3C;
     private const ushort TipSwitchUsage = 0x42;
+    private const ushort BarrelSwitchUsage = 0x44;
+    private const ushort EraserUsage = 0x45;
     private const ushort ContactIdUsage = 0x51;
     private const ushort ContactCountUsage = 0x54;
     private const ushort GenericDesktopPage = 0x01;
@@ -32,19 +38,23 @@ public sealed class RawTouchReader : IDisposable
 
     private sealed record Axis(int Minimum, int Maximum);
     private sealed record Finger(ushort Link, Axis X, Axis Y);
-    private sealed record Device(IntPtr Prepared, List<Finger> Fingers);
+    private sealed record Device(IntPtr Prepared, bool IsPen, List<Finger> Fingers, Axis? Pressure);
 
-    private readonly Action<int, bool, double, double> _contact;
+    private readonly Action<IReadOnlyList<RawContact>> _frame;
+    private readonly Action<RawPen> _pen;
     private readonly Action<string> _log;
     private readonly Dictionary<IntPtr, Device?> _devices = [];
     private readonly HwndSource _window;
     private readonly TouchFrameAssembler _frames = new();
     private int _loggedReports;
+    private int _loggedPenReports;
 
-    /// <param name="contact">Contact id, whether it is touching, and X and Y as 0-1 screen fractions.</param>
-    public RawTouchReader(Action<int, bool, double, double> contact, Action<string> log)
+    /// <param name="frame">One frame of contacts, X and Y as 0-1 screen fractions.</param>
+    /// <param name="pen">One pen report, X, Y and pressure as 0-1 fractions.</param>
+    public RawTouchReader(Action<IReadOnlyList<RawContact>> frame, Action<RawPen> pen, Action<string> log)
     {
-        _contact = contact;
+        _frame = frame;
+        _pen = pen;
         _log = log;
 
         // A message-only window: it receives WM_INPUT but is never shown or composited.
@@ -57,13 +67,16 @@ public sealed class RawTouchReader : IDisposable
 
         var registered = Register(RIDEV_INPUTSINK, _window.Handle);
         _log(registered
-            ? "raw touch registered"
+            ? "raw touch and pen registered"
             : $"raw touch registration failed (err {Marshal.GetLastWin32Error()})");
     }
 
     private static bool Register(uint flags, IntPtr target) => RegisterRawInputDevices(
-        [new RAWINPUTDEVICE { UsagePage = DigitizerPage, Usage = TouchScreenUsage, Flags = flags, Target = target }],
-        1, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
+        [
+            new RAWINPUTDEVICE { UsagePage = DigitizerPage, Usage = TouchScreenUsage, Flags = flags, Target = target },
+            new RAWINPUTDEVICE { UsagePage = DigitizerPage, Usage = PenUsage, Flags = flags, Target = target }
+        ],
+        2, (uint)Marshal.SizeOf<RAWINPUTDEVICE>());
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -112,6 +125,44 @@ public sealed class RawTouchReader : IDisposable
 
     private void ReadReport(Device device, byte[] report)
     {
+        if (device.IsPen) ReadPenReport(device, report);
+        else ReadTouchReport(device, report);
+    }
+
+    private void ReadPenReport(Device device, byte[] report)
+    {
+        var length = (uint)report.Length;
+        var pointer = device.Fingers.FirstOrDefault();
+        if (pointer is null) return;
+
+        // Link 0 searches the whole collection: pens keep everything in one stylus collection.
+        if (HidP_GetUsageValue(HidpInput, GenericDesktopPage, 0, XUsage, out var x,
+                device.Prepared, report, length) != HidpSuccess) return;
+        if (HidP_GetUsageValue(HidpInput, GenericDesktopPage, 0, YUsage, out var y,
+                device.Prepared, report, length) != HidpSuccess) return;
+
+        var usages = new ushort[16];
+        var usageCount = (uint)usages.Length;
+        if (HidP_GetUsages(HidpInput, DigitizerPage, 0, usages, ref usageCount,
+                device.Prepared, report, length) != HidpSuccess) usageCount = 0;
+        var pressed = usages.Take((int)usageCount).ToHashSet();
+
+        // A digitizer without pressure still gets full pressure while the tip is down.
+        var pressure = 1.0;
+        if (device.Pressure is { } axis && HidP_GetUsageValue(HidpInput, DigitizerPage, 0, TipPressureUsage,
+                out var rawPressure, device.Prepared, report, length) == HidpSuccess)
+            pressure = Fraction(rawPressure, axis);
+
+        var pen = new RawPen(pressed.Contains(InRangeUsage), pressed.Contains(TipSwitchUsage),
+            pressed.Contains(BarrelSwitchUsage), pressed.Contains(InvertUsage), pressed.Contains(EraserUsage),
+            Fraction(x, pointer.X), Fraction(y, pointer.Y), pressure);
+        if (_loggedPenReports++ < 4)
+            _log($"raw pen report: range {pen.InRange}, tip {pen.Tip}, pressure {pen.Pressure:F2}");
+        _pen(pen);
+    }
+
+    private void ReadTouchReport(Device device, byte[] report)
+    {
         var length = (uint)report.Length;
         var slots = new List<RawContact>(device.Fingers.Count);
 
@@ -139,8 +190,8 @@ public sealed class RawTouchReader : IDisposable
             device.Prepared, report, length) == HidpSuccess ? (int)count : null;
         if (_loggedReports++ < 6) _log($"raw report: count {contactCount?.ToString() ?? "none"}, {slots.Count} slot(s)");
 
-        foreach (var contact in _frames.Add(contactCount, slots))
-            _contact(contact.Id, contact.Touching, contact.X, contact.Y);
+        var frame = _frames.Add(contactCount, slots);
+        if (frame.Count > 0) _frame(frame);
     }
 
     private static double Fraction(uint value, Axis axis) =>
@@ -152,9 +203,12 @@ public sealed class RawTouchReader : IDisposable
 
         var device = Describe(handle);
         _devices[handle] = device;
-        _log(device is null
-            ? "raw touch device could not be read"
-            : $"raw touch device has {device.Fingers.Count} contact slot(s)");
+        _log(device switch
+        {
+            null => "raw touch device could not be read",
+            { IsPen: true } => $"raw pen device{(device.Pressure is null ? " without pressure" : "")}",
+            _ => $"raw touch device has {device.Fingers.Count} contact slot(s)"
+        });
         return device;
     }
 
@@ -182,17 +236,19 @@ public sealed class RawTouchReader : IDisposable
 
         var xAxes = new Dictionary<ushort, Axis>();
         var yAxes = new Dictionary<ushort, Axis>();
+        Axis? pressure = null;
         for (var i = 0; i < count; i++)
         {
             var entry = raw.AsSpan(i * ValueCapsSize, ValueCapsSize);
-            if (BinaryPrimitives.ReadUInt16LittleEndian(entry) != GenericDesktopPage) continue;
-
+            var page = BinaryPrimitives.ReadUInt16LittleEndian(entry);
             var link = BinaryPrimitives.ReadUInt16LittleEndian(entry[6..]);
             var axis = new Axis(BinaryPrimitives.ReadInt32LittleEndian(entry[40..]),
                 BinaryPrimitives.ReadInt32LittleEndian(entry[44..]));
             if (axis.Maximum <= axis.Minimum) continue;
 
             var usage = BinaryPrimitives.ReadUInt16LittleEndian(entry[56..]);
+            if (page == DigitizerPage && usage == TipPressureUsage) pressure ??= axis;
+            if (page != GenericDesktopPage) continue;
             if (usage == XUsage) xAxes[link] = axis;
             else if (usage == YUsage) yAxes[link] = axis;
         }
@@ -201,7 +257,7 @@ public sealed class RawTouchReader : IDisposable
             .Select(pair => new Finger(pair.Key, pair.Value, yAxes[pair.Key]))
             .OrderBy(finger => finger.Link) // Report order: the contact count applies to the first slots.
             .ToList();
-        return new Device(prepared, fingers);
+        return new Device(prepared, caps.UsagePage == DigitizerPage && caps.Usage == PenUsage, fingers, pressure);
     }
 
     public void Dispose()

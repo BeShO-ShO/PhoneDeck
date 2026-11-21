@@ -81,8 +81,27 @@ mpv av://dshow:video="USB3 Video":audio="Digital Audio Interface (USB3 Digital A
 - `--osc=no` hides mpv's on-screen controls, which touches would otherwise bring up.
 - `--demuxer-lavf-o=audio_buffer_size=50` shrinks the capture audio buffer from its default of
   about half a second, which otherwise delays the picture too.
-- Press `f` for full screen. PhoneDeck's touch mapping assumes a **full-screen 16:9 picture on
-  the main display**, letterboxed if the screen is a different shape.
+- Press `f` for full screen. Touch follows the mpv window, so a windowed or differently shaped
+  picture works too, as long as it is on the main display (the one with the touchscreen).
+
+**PhoneDeck can start mpv for you.** In Settings, under *Phone's screen (mpv)*, pick the
+capture device (and its sound, if you want it), and turn on *Open the phone's screen* on Home.
+Starting capture then opens mpv full screen with the options above, unless mpv is already open. mpv stays open when capture stops and
+closes when PhoneDeck exits. PhoneDeck finds `mpv.exe` on PATH or in Program Files (preferring a
+native ARM64 build on ARM64), or you can enter its location.
+
+PhoneDeck also starts mpv with `--input-ipc-server=\\.\pipe\phonedeck-mpv`, which lets it ask mpv
+exactly where the picture is. If you start mpv yourself, add that option to your shortcut for the
+same precision; without it PhoneDeck assumes a 16:9 picture inside the mpv window.
+
+Windows also delivers your touches to mpv, which by default turns a two-finger move into volume
+changes and a double tap into full screen. The mpv PhoneDeck starts ignores the mouse and wheel
+(its keys, such as `f`, still work), using `%LOCALAPPDATA%\PhoneDeck\mpv-input.conf`. Add
+`--input-conf=` with that file to your own shortcut for the same behaviour.
+
+To switch mpv between full screen and a window while capture is on, tap the **full-screen
+button** on the bar, next to Stop. This needs mpv's control pipe, so it works with the mpv
+PhoneDeck starts or one started with `--input-ipc-server=\\.\pipe\phonedeck-mpv`.
 
 Options that made things **slower** on the development setup, so are best avoided there:
 `--profile=low-latency`, `--untimed`, and `--profile=fast`. Results may differ with other
@@ -124,15 +143,20 @@ The window has three views:
 - **Details** (ⓘ) — the Bluetooth service, pointer pacing, shortcuts and logs.
 - **Settings** (⚙) — startup, closing behaviour, and optional switch keys.
 
-While capture is on with touch enabled, a small bar sits in the black area below the video with
-**Split screen, Recents, Home and Back** buttons and a pause button that turns capture off.
+While capture is on with touch enabled, a small bar sits just below the video with
+**Split screen, Recents, Home and Back** buttons, a button that switches mpv between full screen
+and a window, and a pause button that turns capture off.
 
 ## What PhoneDeck adds
 
 Compared with windows-ble-hid v0.6.0:
 
-- **Touch input**: a single-finger touchscreen report, read directly from the PC's touchscreen
-  (Raw Input) with nothing drawn over the video, mapped onto the letterboxed video.
+- **Touch input**: up to five fingers, so pinch-zoom, two-finger scroll and rotate work on the
+  phone. Read directly from the PC's touchscreen (Raw Input) with nothing drawn over the video,
+  and mapped onto wherever the video is.
+- **Pen input**: a pen on the PC's screen is sent as a stylus, with hover, pressure, the barrel
+  button and the eraser end.
+- **Starts mpv** on the capture device when capture starts, if you choose a device in Settings.
 - **Navigation bar** for Android: Split screen, Recents, Home and Back, sent as keyboard
   shortcuts because edge gestures can't be performed by an external touchscreen.
 - **Ctrl+Alt+Q toggles** capture on and off, and always turns on to the phone.
@@ -170,8 +194,11 @@ zips to a GitHub release.
 
 ## Known limitations
 
-- One finger only; multi-finger touch gestures are not sent.
-- Touch mapping assumes a 16:9 video, full screen on the main display.
+- Up to five fingers at once.
+- Touch and pen work only on the main display, where the PC's touchscreen is.
+- **Pen needs a fresh pairing**: a phone paired with an older PhoneDeck keeps the old device
+  description and ignores the pen. Forget the PC on the phone, remove the phone in Windows'
+  Bluetooth settings, and pair again. Fingers work without re-pairing.
 - Builds are unsigned, so Windows SmartScreen may warn on first run.
 - After PhoneDeck restarts, the phone usually needs a **Connect** tap in its Bluetooth
   settings to reconnect.

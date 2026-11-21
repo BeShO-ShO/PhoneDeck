@@ -19,6 +19,7 @@ public static class HidDescriptors
     public const byte MouseReportId    = 2;
     public const byte TouchReportId    = 3;
     public const byte TouchCertificateReportId = 4;
+    public const byte PenReportId      = 5;
     public const int TouchCertificateLength = 256;
 
     public const byte ReportTypeInput  = 1;
@@ -34,7 +35,10 @@ public static class HidDescriptors
     /// <summary>bcdHID 1.11, country code 0, flags = RemoteWake | NormallyConnectable.</summary>
     public static readonly byte[] HidInformationValue = [0x11, 0x01, 0x00, 0x03];
 
-    /// <summary>Composite descriptor: keyboard on report ID 1, mouse on report ID 2.</summary>
+    /// <summary>
+    /// Composite descriptor: keyboard (1), mouse (2), touchscreen (3, with feature 4) and pen (5).
+    /// Hosts cache it at pairing, so any change here needs the phone to forget and re-pair.
+    /// </summary>
     public static readonly byte[] ReportMapValue =
     [
         // ---- Keyboard (Report ID 1) ----
@@ -164,6 +168,45 @@ public static class HidDescriptors
         0x75, 0x08,       //   Report Size (8)
         0x96, 0x00, 0x01, //   Report Count (256)
         0xB1, 0x02,       //   Feature (Data,Var,Abs)
+        0xC0,             // End Collection
+
+        // ---- Pen (Report ID 5) ----
+        // Its own application collection, so Linux gives it a separate input device with
+        // INPUT_PROP_DIRECT: a stylus on the screen, with hover, pressure and the eraser.
+        // Hosts that paired before this existed keep the old report map and ignore it until
+        // they forget and re-pair.
+        0x05, 0x0D,       // Usage Page (Digitizer)
+        0x09, 0x02,       // Usage (Pen)
+        0xA1, 0x01,       // Collection (Application)
+        0x85, PenReportId,
+        0x09, 0x20,       //   Usage (Stylus)
+        0xA1, 0x00,       //   Collection (Physical)
+        0x09, 0x42,       //     Usage (Tip Switch)
+        0x09, 0x44,       //     Usage (Barrel Switch)
+        0x09, 0x3C,       //     Usage (Invert)
+        0x09, 0x45,       //     Usage (Eraser)
+        0x09, 0x32,       //     Usage (In Range)
+        0x15, 0x00,       //     Logical Minimum (0)
+        0x25, 0x01,       //     Logical Maximum (1)
+        0x75, 0x01,       //     Report Size (1)
+        0x95, 0x05,       //     Report Count (5)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - tip, barrel, invert, eraser, in range
+        0x95, 0x03,       //     Report Count (3)
+        0x81, 0x01,       //     Input (Const)        - padding
+        0x05, 0x01,       //     Usage Page (Generic Desktop)
+        0x09, 0x30,       //     Usage (X)
+        0x09, 0x31,       //     Usage (Y)
+        0x15, 0x00,       //     Logical Minimum (0)
+        0x26, 0xFF, 0x7F, //     Logical Maximum (32767)
+        0x75, 0x10,       //     Report Size (16)
+        0x95, 0x02,       //     Report Count (2)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - x, y
+        0x05, 0x0D,       //     Usage Page (Digitizer)
+        0x09, 0x30,       //     Usage (Tip Pressure)
+        0x26, 0xFF, 0x0F, //     Logical Maximum (4095)
+        0x95, 0x01,       //     Report Count (1)
+        0x81, 0x02,       //     Input (Data,Var,Abs) - pressure
+        0xC0,             //   End Collection
         0xC0              // End Collection
     ];
 }

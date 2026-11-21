@@ -42,6 +42,52 @@ public sealed class TouchInputTests
         Assert.Equal(HidReports.KeyboardReportLength * 8, bits[HidDescriptors.KeyboardReportId]);
         Assert.Equal(HidReports.MouseReportLength * 8, bits[HidDescriptors.MouseReportId]);
         Assert.Equal(HidReports.TouchReportLength * 8, bits[HidDescriptors.TouchReportId]);
+        Assert.Equal(HidReports.PenReportLength * 8, bits[HidDescriptors.PenReportId]);
+        Assert.Equal(HidReports.PenReportLength, HidReports.Pen(PenFlags.None, 0, 0, 0).Length);
+    }
+
+    [Fact]
+    public void A_two_finger_frame_is_two_reports_and_only_the_first_carries_the_count()
+    {
+        var reports = HidReports.TouchFrame(
+        [
+            new TouchPoint(0, true, 0x0102, 0x0304),
+            new TouchPoint(1, false, 0x0506, 0x0708)
+        ]);
+
+        Assert.Equal(new byte[] { 0x03, 0x00, 0x02, 0x01, 0x04, 0x03, 0x02 }, reports[0]);
+        Assert.Equal(new byte[] { 0x00, 0x01, 0x06, 0x05, 0x08, 0x07, 0x00 }, reports[1]);
+    }
+
+    [Fact]
+    public void Touch_contact_count_maximum_fits_the_descriptor()
+    {
+        // Contact Identifier and Contact Count are both declared 0-127.
+        Assert.InRange(HidReports.MaxTouchContacts, 1, 127);
+    }
+
+    [Fact]
+    public void Pen_report_packs_bits_position_and_pressure()
+    {
+        Assert.Equal(new byte[] { 0x13, 0x34, 0x12, 0x78, 0x56, 0xFF, 0x0F },
+            HidReports.Pen(PenFlags.InRange | PenFlags.Tip | PenFlags.Barrel, 0x1234, 0x5678, 99999));
+    }
+
+    [Fact]
+    public void Hovering_pen_reports_no_pressure()
+    {
+        var report = HidReports.Pen(PenFlags.InRange, 10, 10, 2000);
+
+        Assert.Equal(0, BitConverter.ToUInt16(report, 5));
+    }
+
+    [Fact]
+    public void Pen_collection_is_declared_with_its_report_id()
+    {
+        var map = HidDescriptors.ReportMapValue;
+        byte[] pen = [0x05, 0x0D, 0x09, 0x02, 0xA1, 0x01, 0x85, HidDescriptors.PenReportId];
+
+        Assert.True(map.AsSpan().IndexOf(pen) >= 0, "pen application collection missing");
     }
 
     [Fact]
@@ -84,7 +130,8 @@ public sealed class TouchInputTests
         byte[] ids =
         [
             HidDescriptors.KeyboardReportId, HidDescriptors.MouseReportId,
-            HidDescriptors.TouchReportId, HidDescriptors.TouchCertificateReportId
+            HidDescriptors.TouchReportId, HidDescriptors.TouchCertificateReportId,
+            HidDescriptors.PenReportId
         ];
 
         Assert.Equal(ids.Length, ids.Distinct().Count());
@@ -166,5 +213,61 @@ public sealed class TouchInputTests
         // 1000 tall at 1:1 is 1000 wide, leaving 500 either side of a 2000-wide view.
         Assert.False(TouchMapper.IsInsideVideo(499, 500, 2000, 1000, 1.0));
         Assert.Equal(0, TouchMapper.Map(500, 500, 2000, 1000, 1.0).X);
+    }
+
+    [Fact]
+    public void A_windowed_video_maps_from_its_own_corner()
+    {
+        var video = new VideoRect(100, 200, 800, 450);
+
+        Assert.Equal((0, 0), TouchMapper.Map(100, 200, video));
+        Assert.Equal((HidReports.TouchLogicalMax, HidReports.TouchLogicalMax), TouchMapper.Map(900, 650, video));
+        Assert.False(video.Contains(99, 300));
+    }
+
+    [Fact]
+    public void Letterbox_is_offset_by_the_window_position()
+    {
+        // A 1000x1000 window at (50, 60): a 16:9 picture is 1000x562.5, centred vertically.
+        var video = VideoRect.Letterbox(50, 60, 1000, 1000, Wide);
+
+        Assert.Equal(50.0, video.Left);
+        Assert.Equal(60 + (1000 - 562.5) / 2, video.Top, 6);
+        Assert.Equal(562.5, video.Height, 6);
+    }
+
+    [Fact]
+    public void Mpv_margins_place_the_video_inside_the_window()
+    {
+        var osd = MpvVideoLocator.ParseOsd(
+            """{"data":{"w":1920,"h":1280,"aspect":1.777,"par":1,"mt":100,"mb":100,"ml":0,"mr":0},"request_id":7,"error":"success"}""");
+
+        Assert.NotNull(osd);
+        Assert.Equal(new VideoRect(10, 120, 1920, 1080), MpvVideoLocator.FromOsd(osd.Value, 10, 20, 1920, 1280));
+    }
+
+    [Fact]
+    public void Mpv_margins_scale_when_its_pixels_differ_from_the_window()
+    {
+        var osd = new MpvVideoLocator.OsdDimensions(960, 640, 0, 50, 0, 50);
+
+        Assert.Equal(new VideoRect(0, 100, 1920, 1080), MpvVideoLocator.FromOsd(osd, 0, 0, 1920, 1280));
+    }
+
+    [Fact]
+    public void Mpv_commands_are_one_json_line()
+    {
+        Assert.Equal("{\"command\":[\"cycle\",\"fullscreen\"]}\n", MpvVideoLocator.CommandLine("cycle", "fullscreen"));
+    }
+
+    [Theory]
+    [InlineData("""{"event":"video-reconfig"}""")]
+    [InlineData("""{"data":{"w":0,"h":0},"request_id":7,"error":"success"}""")]
+    [InlineData("""{"data":{"w":10,"h":10},"request_id":3,"error":"success"}""")]
+    [InlineData("""{"error":"property unavailable","request_id":7}""")]
+    [InlineData("not json")]
+    public void Mpv_answers_that_are_not_usable_are_ignored(string line)
+    {
+        Assert.Null(MpvVideoLocator.ParseOsd(line));
     }
 }
