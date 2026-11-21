@@ -438,6 +438,104 @@ public sealed class InputCaptureTests
     }
 
     [Fact]
+    public void Even_pacing_never_merges_a_quick_click()
+    {
+        var now = 0.0;
+        var queue = new CaptureSession.ReportQueue(() => now);
+        queue.SetEvenPacing(true);
+        queue.EnqueueMouse(MouseButtons.None, 30, 0, 0);
+        now = 4;
+        queue.EnqueueMouse(MouseButtons.Left, 0, 0, 0);
+        queue.EnqueueMouse(MouseButtons.None, 0, 0, 0);
+
+        // The motion before the click goes first, all of it, so the click lands in place.
+        Assert.True(queue.TryDequeue(out var motion));
+        Assert.Equal((MouseButtons.None, 30, 0), (motion.Buttons, motion.Dx, motion.Dy));
+        Assert.True(queue.TryDequeue(out var down));
+        Assert.Equal(MouseButtons.Left, down.Buttons);
+        Assert.True(queue.TryDequeue(out var up));
+        Assert.Equal(MouseButtons.None, up.Buttons);
+        Assert.False(queue.TryDequeue(out _));
+        Assert.False(queue.HasMouseReport);
+    }
+
+    [Fact]
+    public void Even_pacing_releases_motion_over_time_with_the_held_buttons()
+    {
+        var now = 100.0;
+        var queue = new CaptureSession.ReportQueue(() => now);
+        queue.SetEvenPacing(true);
+        queue.EnqueueMouse(MouseButtons.Left, 0, 0, 0);
+        Assert.True(queue.TryDequeue(out _));
+
+        queue.EnqueueMouse(MouseButtons.Left, 16, 0, 2);
+        // Wheel is not smoothed; motion is not yet due.
+        Assert.True(queue.TryTakeMouseReport(out var first));
+        Assert.Equal((MouseButtons.Left, 0, 2), (first.Buttons, first.Dx, first.Wheel));
+        Assert.True(queue.HasMouseReport);
+
+        now += PointerResampler.MaxDelayMs + 1;
+        Assert.True(queue.TryTakeMouseReport(out var drag));
+        Assert.Equal((MouseButtons.Left, 16, 0), (drag.Buttons, drag.Dx, drag.Wheel));
+        Assert.False(queue.HasMouseReport);
+        Assert.False(queue.TryTakeMouseReport(out _));
+    }
+
+    [Fact]
+    public void Even_pacing_flushes_before_a_target_change()
+    {
+        var now = 0.0;
+        var queue = new CaptureSession.ReportQueue(() => now);
+        queue.SetEvenPacing(true);
+        queue.EnqueueMouse(MouseButtons.None, 9, -3, 0);
+        queue.EnqueueTargetChange(CaptureSession.Queued.GoLocal);
+
+        Assert.True(queue.TryDequeue(out var motion));
+        Assert.Equal((9, -3), (motion.Dx, motion.Dy));
+        Assert.True(queue.TryDequeue(out var change));
+        Assert.Equal(CaptureSession.Queued.GoLocal, change.Kind);
+        Assert.False(queue.HasMouseReport);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Switching_pacing_mode_hands_queued_motion_over(bool startEven)
+    {
+        var now = 0.0;
+        var queue = new CaptureSession.ReportQueue(() => now);
+        queue.SetEvenPacing(startEven);
+        queue.EnqueueMouse(MouseButtons.None, 11, 5, 0);
+        queue.SetEvenPacing(!startEven);
+
+        Assert.True(queue.TryDequeue(out var handed));
+        Assert.Equal((11, 5), (handed.Dx, handed.Dy));
+        Assert.False(queue.HasMouseReport);
+    }
+
+    [Fact]
+    public void Wheel_fractions_add_up_to_notches()
+    {
+        using var capture = new InputCapture();
+        // A precision touchpad scrolling in 30-unit steps: one notch per four events.
+        var notches = Enumerable.Range(0, 8).Select(_ => capture.TakeWheelNotches(30)).ToList();
+        Assert.Equal(new[] { 0, 0, 0, 1, 0, 0, 0, 1 }, notches);
+
+        Assert.Equal(2, capture.TakeWheelNotches(240));
+        Assert.Equal(-1, capture.TakeWheelNotches(-120));
+    }
+
+    [Fact]
+    public void Wheel_remainder_is_dropped_when_direction_changes()
+    {
+        using var capture = new InputCapture();
+        Assert.Equal(0, capture.TakeWheelNotches(100));
+        // Without the reset, 100 - 120 would give no notch at all.
+        Assert.Equal(-1, capture.TakeWheelNotches(-120));
+        Assert.Equal(0, capture.TakeWheelNotches(0));
+    }
+
+    [Fact]
     public void Mouse_motion_remains_coalesced_between_target_changes()
     {
         var queue = new CaptureSession.ReportQueue();

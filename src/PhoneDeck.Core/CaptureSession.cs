@@ -15,15 +15,51 @@ public static class CaptureSession
         KeyModifiers Modifiers = KeyModifiers.None, byte[]? Usages = null,
         MouseButtons Buttons = MouseButtons.None, int Dx = 0, int Dy = 0, int Wheel = 0);
 
-    internal sealed class ReportQueue
+    /// <summary>
+    /// Two ways to batch pointer motion between reports. Coalescing (the original) sums whatever
+    /// arrived. Even pacing passes motion through <see cref="PointerResampler"/> so every report
+    /// carries an equal share of a steady movement, and never merges a button change: the motion
+    /// before a click is flushed first, so the click lands where the pointer was.
+    /// </summary>
+    internal sealed class ReportQueue(Func<double>? clockMs = null)
     {
+        private static readonly double TicksPerMs = Stopwatch.Frequency / 1000.0;
+        private readonly Func<double> _clockMs = clockMs ?? (() => Stopwatch.GetTimestamp() / TicksPerMs);
         private readonly ConcurrentQueue<InputReport> _ordered = new();
         private readonly object _mouseLock = new();
         private InputReport? _pendingMouse;
 
+        private readonly PointerResampler _resampler = new();
+        private bool _even;
+        private MouseButtons _buttons;
+        private int _evenWheel;
+
         public bool HasMouseReport
         {
-            get { lock (_mouseLock) return _pendingMouse.HasValue; }
+            get
+            {
+                lock (_mouseLock)
+                    return _pendingMouse.HasValue || _resampler.HasPending || _evenWheel != 0;
+            }
+        }
+
+        /// <summary>Switches batching; motion already queued is handed over, never dropped.</summary>
+        public void SetEvenPacing(bool on)
+        {
+            lock (_mouseLock)
+            {
+                if (on == _even) return;
+                if (on)
+                {
+                    if (_pendingMouse is { } mouse) _ordered.Enqueue(mouse);
+                    _pendingMouse = null;
+                }
+                else
+                {
+                    FlushEven();
+                }
+                _even = on;
+            }
         }
 
         public void EnqueueKeyboard(KeyModifiers modifiers, byte[] usages) =>
@@ -33,9 +69,25 @@ public static class CaptureSession
         {
             lock (_mouseLock)
             {
-                var pending = _pendingMouse.GetValueOrDefault();
-                _pendingMouse = new(Queued.MouseReport, Buttons: buttons,
-                    Dx: pending.Dx + dx, Dy: pending.Dy + dy, Wheel: pending.Wheel + wheel);
+                if (!_even)
+                {
+                    var pending = _pendingMouse.GetValueOrDefault();
+                    _pendingMouse = new(Queued.MouseReport, Buttons: buttons,
+                        Dx: pending.Dx + dx, Dy: pending.Dy + dy, Wheel: pending.Wheel + wheel);
+                    _buttons = buttons;
+                    return;
+                }
+
+                if (buttons != _buttons)
+                {
+                    FlushEven();
+                    _ordered.Enqueue(new(Queued.MouseReport, Buttons: buttons, Dx: dx, Dy: dy, Wheel: wheel));
+                    _buttons = buttons;
+                    return;
+                }
+
+                if (dx != 0 || dy != 0) _resampler.Add(_clockMs(), dx, dy);
+                _evenWheel += wheel;
             }
         }
 
@@ -48,27 +100,48 @@ public static class CaptureSession
                     _ordered.Enqueue(mouse);
                     _pendingMouse = null;
                 }
+                FlushEven();
                 _ordered.Enqueue(new(kind));
             }
         }
 
         public bool TryDequeue(out InputReport report) => _ordered.TryDequeue(out report);
 
+        /// <summary>
+        /// False when nothing is due. With even pacing that can happen while motion is still
+        /// pending (<see cref="HasMouseReport"/> stays true), so the caller looks again shortly.
+        /// </summary>
         public bool TryTakeMouseReport(out InputReport report)
         {
             lock (_mouseLock)
             {
-                if (!_ordered.IsEmpty)
+                report = default;
+                if (!_ordered.IsEmpty) return false;
+
+                if (!_even)
                 {
-                    report = default;
-                    return false;
+                    report = _pendingMouse.GetValueOrDefault();
+                    var available = _pendingMouse.HasValue;
+                    _pendingMouse = null;
+                    return available;
                 }
 
-                report = _pendingMouse.GetValueOrDefault();
-                var available = _pendingMouse.HasValue;
-                _pendingMouse = null;
-                return available;
+                var (dx, dy) = _resampler.Take(_clockMs());
+                var wheel = _evenWheel;
+                _evenWheel = 0;
+                if (dx == 0 && dy == 0 && wheel == 0) return false;
+                report = new(Queued.MouseReport, Buttons: _buttons, Dx: dx, Dy: dy, Wheel: wheel);
+                return true;
             }
+        }
+
+        // Caller holds _mouseLock.
+        private void FlushEven()
+        {
+            var (dx, dy) = _resampler.Flush();
+            if (dx == 0 && dy == 0 && _evenWheel == 0) return;
+            _ordered.Enqueue(new(Queued.MouseReport, Buttons: _buttons, Dx: dx, Dy: dy, Wheel: _evenWheel));
+            _evenWheel = 0;
         }
     }
 
@@ -110,6 +183,10 @@ public static class CaptureSession
     /// same hotkey drops to the local target instead and capture keeps running.
     /// </param>
     /// <param name="chordSwitch">Whether Ctrl+D+C switches target as well as Ctrl+Alt+CapsLock.</param>
+    /// <param name="evenPacing">
+    /// Read per report like <paramref name="mouseIntervalMs"/>. Null means on.
+    /// See <see cref="PointerResampler"/>.
+    /// </param>
     public static async Task<int> RunAsync(
         BleHidPeripheral peripheral,
         Action<string> log,
@@ -119,8 +196,10 @@ public static class CaptureSession
         CancellationToken cancellationToken,
         bool chordSwitch = true,
         bool touchGoesToHost = false,
-        bool capsLockSwitch = true)
+        bool capsLockSwitch = true,
+        Func<bool>? evenPacing = null)
     {
+        evenPacing ??= () => true;
         using var capture = new InputCapture { Verbose = verbose };
         capture.SetChordSwitch(chordSwitch);
         capture.SetCapsLockSwitch(capsLockSwitch);
@@ -147,6 +226,7 @@ public static class CaptureSession
         // far more events than the BLE link can carry. Target changes travel through the same
         // queue so they take effect only after the key-release report has gone to the old host.
         var reports = new ReportQueue();
+        reports.SetEvenPacing(evenPacing());
         var sent = 0;
 
         // The radio interleaves connection events across every subscribed link, so a second host
@@ -170,6 +250,8 @@ public static class CaptureSession
         }
 
         using var pumpCancellation = new CancellationTokenSource();
+        using var pacingTimer = new PreciseTimer();
+        if (verbose) log($"  [pump] high-resolution pacing timer: {pacingTimer.IsHighResolution}");
         var pump = Task.Run(async () =>
         {
             var clock = Stopwatch.StartNew();
@@ -187,6 +269,7 @@ public static class CaptureSession
 
                 try
                 {
+                    reports.SetEvenPacing(evenPacing());
                     while (reports.TryDequeue(out var key))
                     {
                         if (key.Kind == Queued.MouseReport)
@@ -233,9 +316,19 @@ public static class CaptureSession
 
                     var sinceLast = clock.ElapsedMilliseconds - lastMouseSend;
                     if (sinceLast < interval)
-                        await Task.Delay((int)(interval - sinceLast), pumpCancellation.Token);
+                        await pacingTimer.WaitAsync((int)(interval - sinceLast), pumpCancellation.Token);
 
-                    if (!reports.TryTakeMouseReport(out var mouse)) continue;
+                    if (!reports.TryTakeMouseReport(out var mouse))
+                    {
+                        // Even pacing: motion is queued but not due yet. Look again shortly
+                        // rather than waiting for the next input event, which may never come.
+                        if (reports.HasMouseReport)
+                        {
+                            await pacingTimer.WaitAsync(2, pumpCancellation.Token);
+                            Wake();
+                        }
+                        continue;
+                    }
 
                     {
                         var started = clock.ElapsedMilliseconds;
@@ -244,6 +337,9 @@ public static class CaptureSession
                         if (verbose && sent < 40) log($"  [pump] mouse notify #{sent} ({mouse.Dx},{mouse.Dy}) took {lastMouseSend - started} ms");
                         Interlocked.Increment(ref sent);
                     }
+
+                    // The resampler releases motion over time, so keep ticking until it drains.
+                    if (reports.HasMouseReport) Wake();
                 }
                 catch (OperationCanceledException) { break; }
                 catch (Exception ex)

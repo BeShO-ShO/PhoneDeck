@@ -3,6 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       xmlns:conv="clr-namespace:PhoneDeck.App.Converters"
+      xmlns:services="clr-namespace:PhoneDeck.App.Services"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
       Title="Details">
 
@@ -93,6 +94,18 @@
       </Grid>
 
       <ui:TextBlock Text="Pointer" FontTypography="Subtitle" Margin="0,0,0,8" />
+
+      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Even pointer pacing" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Spreads movement evenly so the phone's pointer moves smoothly. Off sends it in bursts. Takes effect at once." />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <ui:ToggleSwitch IsChecked="{Binding EvenPointerPacing, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      </ui:CardControl>
 
       <ui:CardControl Icon="{ui:SymbolIcon Timer24}" Margin="0,0,0,20">
         <ui:CardControl.Header>

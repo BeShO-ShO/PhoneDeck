@@ -507,6 +507,23 @@ public sealed class InputCapture : IDisposable
         RequestHostSwitch();
     }
 
+    private int _wheelRemainder;
+
+    /// <summary>
+    /// Whole notches (120 units each) from a wheel event. Precision touchpads and smooth-scroll
+    /// mice send fractions of a notch, which a plain division would throw away one by one, so
+    /// the remainder carries to the next event. A change of direction starts afresh.
+    /// </summary>
+    internal int TakeWheelNotches(int delta)
+    {
+        if (delta == 0) return 0;
+        if (Math.Sign(delta) != Math.Sign(_wheelRemainder)) _wheelRemainder = 0;
+        _wheelRemainder += delta;
+        var notches = _wheelRemainder / 120;
+        _wheelRemainder -= notches * 120;
+        return notches;
+    }
+
     internal bool HandleMouseButtonEvent(MouseButtons button, bool isDown)
     {
         var releaseLocally = !isDown && (_localButtons & button) != MouseButtons.None;
@@ -592,7 +609,7 @@ public sealed class InputCapture : IDisposable
                 break;
 
             case WM_MOUSEWHEEL:
-                var notches = (short)((data.mouseData >> 16) & 0xFFFF) / 120;
+                var notches = TakeWheelNotches((short)((data.mouseData >> 16) & 0xFFFF));
                 if (notches != 0) MouseReport?.Invoke(_buttons, 0, 0, notches);
                 break;
         }

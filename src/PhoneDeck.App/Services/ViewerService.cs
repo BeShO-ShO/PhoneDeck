@@ -85,6 +85,15 @@ public sealed class ViewerService
             "--osc=no",
             "--fs",
             "--cursor-autohide=always",
+            // A pen stroke reaches mpv as a left-button drag, which by default moves a windowed
+            // mpv along with the stroke. The title bar still moves it.
+            "--no-window-dragging",
+            // Less picture delay, which matters most for the mouse pointer: keep one presented
+            // frame queued instead of two, always show the newest captured frame, and do not
+            // wait for the display's refresh (fast motion may show a faint tear).
+            "--swapchain-depth=1",
+            "--video-latency-hacks=yes",
+            "--d3d11-sync-interval=0",
             $@"--input-ipc-server=\\.\pipe\{MpvVideoLocator.PipeName}",
             "--title=PhoneDeck - phone screen"
         };

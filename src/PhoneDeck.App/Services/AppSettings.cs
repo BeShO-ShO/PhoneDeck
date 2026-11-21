@@ -59,6 +59,15 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _touchLayerEnabled, value)) Save(); }
     }
 
+    private bool _evenPointerPacing = true;
+
+    /// <summary>Spreads pointer motion evenly over reports (see PointerResampler); applies live.</summary>
+    public bool EvenPointerPacing
+    {
+        get => _evenPointerPacing;
+        set { if (Set(ref _evenPointerPacing, value)) Save(); }
+    }
+
     private bool _openViewerWithCapture = true;
 
     /// <summary>Whether starting capture also opens mpv on <see cref="ViewerVideoDevice"/>.</summary>

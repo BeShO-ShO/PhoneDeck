@@ -97,7 +97,16 @@ same precision; without it PhoneDeck assumes a 16:9 picture inside the mpv windo
 Windows also delivers your touches to mpv, which by default turns a two-finger move into volume
 changes and a double tap into full screen. The mpv PhoneDeck starts ignores the mouse and wheel
 (its keys, such as `f`, still work), using `%LOCALAPPDATA%\PhoneDeck\mpv-input.conf`. Add
-`--input-conf=` with that file to your own shortcut for the same behaviour.
+`--input-conf=` with that file to your own shortcut for the same behaviour. It is also started
+with `--no-window-dragging`, because a pen stroke reaches mpv as a mouse drag and would
+otherwise move a windowed mpv; the title bar still moves it.
+
+For less picture delay, which you notice most with the mouse pointer, PhoneDeck also starts mpv
+with `--swapchain-depth=1 --video-latency-hacks=yes --d3d11-sync-interval=0`. These keep fewer
+frames queued, always show the newest captured frame, and stop waiting for the display's
+refresh (fast motion may show a faint tear). On the development setup they made the pointer
+noticeably easier to steer, together with **Enhance pointer precision** turned on in Windows'
+mouse settings.
 
 To switch mpv between full screen and a window while capture is on, tap the **full-screen
 button** on the bar, next to Stop. This needs mpv's control pipe, so it works with the mpv
@@ -170,6 +179,10 @@ Compared with windows-ble-hid v0.6.0:
 - **Lower pointer delay on the phone** (Windows 11): PhoneDeck asks the phone for its fastest
   Bluetooth link, and keeps its report timer precise while it sits in the tray. Details → Logs
   shows the link interval the phone settled on.
+- **Even pointer pacing**: movement is spread evenly across reports, so Android's pointer
+  acceleration sees a steady speed instead of bursts and the pointer moves smoothly. Clicks and
+  target changes wait for the movement before them. Switch it off in Details to compare.
+- **Touchpad scrolling**: fractions of a wheel notch add up instead of being dropped.
 - **Smaller download**: compressed single-file builds.
 
 ## Building
