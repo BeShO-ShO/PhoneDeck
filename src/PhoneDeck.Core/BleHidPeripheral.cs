@@ -26,6 +26,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     private readonly ConcurrentDictionary<string, string> _hostNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, BluetoothLEDevice> _hostDevices = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _connectionIntervalsMs = new(StringComparer.OrdinalIgnoreCase);
+    // A preferred-parameters request only lasts while its object is held, so one is kept per
+    // connected host and disposed when that host disconnects.
+    private readonly ConcurrentDictionary<string, IDisposable> _fastLinkRequests = new(StringComparer.OrdinalIgnoreCase);
     // Absent means not yet confirmed, which is treated the same as unpaired.
     private readonly ConcurrentDictionary<string, bool> _pairedHosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, byte> _warnedUnpaired = new(StringComparer.OrdinalIgnoreCase);
@@ -549,7 +552,10 @@ public sealed class BleHidPeripheral : IAsyncDisposable
                 if (!_pairedHosts.GetValueOrDefault(deviceId)) await RefreshPairingAsync(deviceId);
 
                 if (CanReadConnectionParameters && device.ConnectionStatus == BluetoothConnectionStatus.Connected)
+                {
+                    RequestFastLink(device);
                     UpdateConnectionInterval(device);
+                }
             }
         }
         catch (Exception ex)
@@ -589,6 +595,9 @@ public sealed class BleHidPeripheral : IAsyncDisposable
         // A bond can be removed while the link is down, so a reconnect has to prove it again.
         _pairedHosts.TryRemove(sender.DeviceId, out _);
 
+        // The request dies with the link; a reconnect asks again.
+        if (_fastLinkRequests.TryRemove(sender.DeviceId, out var fastLink)) fastLink.Dispose();
+
         // The host owns its lock state and can change it while we are not attached, so a
         // reconnect starts from the default rather than carrying a stale belief forward.
         _lockState.Forget(sender.DeviceId);
@@ -603,6 +612,42 @@ public sealed class BleHidPeripheral : IAsyncDisposable
     [SupportedOSPlatform("windows10.0.22000.0")]
     private void OnConnectionParametersChanged(BluetoothLEDevice sender, object args) =>
         UpdateConnectionInterval(sender);
+
+    /// <summary>
+    /// Asks the host for the shortest link interval it will grant. Android usually settles on
+    /// 15-30 ms, and pointer reports can go no faster than one per interval, so a shorter one
+    /// directly cuts pointer delay. The host may refuse; the interval it actually uses is still
+    /// read back through <see cref="UpdateConnectionInterval"/> and logged.
+    /// </summary>
+    [SupportedOSPlatform("windows10.0.22000.0")]
+    private void RequestFastLink(BluetoothLEDevice device)
+    {
+        if (_fastLinkRequests.ContainsKey(device.DeviceId)) return;
+        try
+        {
+            var request = device.RequestPreferredConnectionParameters(
+                BluetoothLEPreferredConnectionParameters.ThroughputOptimized);
+            Log?.Invoke($"[link] asked {ShortAddress(device.DeviceId)} for a fast link: {request.Status}");
+            // Refused requests are remembered too, so each connection asks only once.
+            var held = request.Status == BluetoothLEPreferredConnectionParametersRequestStatus.Success
+                ? (IDisposable)request
+                : NoRequest.Instance;
+            if (!ReferenceEquals(held, request)) request.Dispose();
+            if (!_fastLinkRequests.TryAdd(device.DeviceId, held)) held.Dispose();
+        }
+        catch (Exception ex)
+        {
+            // Not every Windows 11 build or radio driver supports this; pacing still works.
+            Log?.Invoke($"[link] fast link request not available: {ex.Message}");
+            _fastLinkRequests.TryAdd(device.DeviceId, NoRequest.Instance);
+        }
+    }
+
+    private sealed class NoRequest : IDisposable
+    {
+        public static readonly NoRequest Instance = new();
+        public void Dispose() { }
+    }
 
     [SupportedOSPlatform("windows10.0.22000.0")]
     private void UpdateConnectionInterval(BluetoothLEDevice device)
@@ -953,6 +998,8 @@ public sealed class BleHidPeripheral : IAsyncDisposable
                 device.ConnectionParametersChanged -= OnConnectionParametersChanged;
             device.Dispose();
         }
+        foreach (var request in _fastLinkRequests.Values) request.Dispose();
+        _fastLinkRequests.Clear();
         _hostDevices.Clear();
         _connectionIntervalsMs.Clear();
         return ValueTask.CompletedTask;

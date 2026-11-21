@@ -167,6 +167,9 @@ Compared with windows-ble-hid v0.6.0:
 - **Reliability**: held keys and buttons are released on stop, Bluetooth requests that arrive
   after a disconnect no longer crash the app, and a lost touch contact no longer freezes touch.
 - **Lower lag on the PC**: the mouse hook is removed while input stays on the PC.
+- **Lower pointer delay on the phone** (Windows 11): PhoneDeck asks the phone for its fastest
+  Bluetooth link, and keeps its report timer precise while it sits in the tray. Details → Logs
+  shows the link interval the phone settled on.
 - **Smaller download**: compressed single-file builds.
 
 ## Building

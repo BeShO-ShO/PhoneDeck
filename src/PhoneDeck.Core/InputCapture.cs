@@ -209,7 +209,10 @@ public sealed class InputCapture : IDisposable
     {
         _threadId = GetCurrentThreadId();
 
-        // Default timer granularity is ~15.6 ms, too coarse to pace HID reports.
+        // Default timer granularity is ~15.6 ms, too coarse to pace HID reports. Windows 11
+        // ignores this for a process with no visible window (PhoneDeck lives in the tray during
+        // capture) unless the process opts out of that throttling first.
+        KeepTimerPrecise();
         timeBeginPeriod(1);
 
         _centerX = GetSystemMetrics(0) / 2;
@@ -661,6 +664,43 @@ public sealed class InputCapture : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+    private const int ProcessPowerThrottling = 4;
+    private const uint PowerThrottlingExecutionSpeed = 0x1;
+    private const uint PowerThrottlingIgnoreTimerResolution = 0x4;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PowerThrottlingState
+    {
+        public uint Version;
+        public uint ControlMask;
+        public uint StateMask;
+    }
+
+    /// <summary>
+    /// Opts the whole process out of timer-resolution and EcoQoS throttling: the control bits
+    /// are set with their state bits clear, which means "never throttle". Older Windows
+    /// rejects the bits it does not know, which leaves things as they were.
+    /// </summary>
+    private void KeepTimerPrecise()
+    {
+        var state = new PowerThrottlingState
+        {
+            Version = 1,
+            ControlMask = PowerThrottlingExecutionSpeed | PowerThrottlingIgnoreTimerResolution,
+            StateMask = 0,
+        };
+        var ok = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling,
+            ref state, (uint)Marshal.SizeOf<PowerThrottlingState>());
+        Log?.Invoke($"  [timer] power throttling opt-out: {(ok ? "on" : $"unavailable ({Marshal.GetLastWin32Error()})")}");
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetProcessInformation(IntPtr hProcess, int processInformationClass,
+        ref PowerThrottlingState processInformation, uint processInformationSize);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
 
     [DllImport("winmm.dll")]
     private static extern uint timeBeginPeriod(uint uPeriod);
