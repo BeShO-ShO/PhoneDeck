@@ -37,6 +37,7 @@ public sealed class TouchOverlayWindow : Window
     private static readonly Geometry SplitIcon = Geometry.Parse("M3,4 H21 V20 H3 Z M12,4 V20");
     private static readonly Geometry PauseIcon = Geometry.Parse("M8,5 V19 M16,5 V19");
     private static readonly Geometry FullScreenIcon = Geometry.Parse("M3,9 V3 H9 M15,3 H21 V9 M21,15 V21 H15 M9,21 H3 V15");
+    private static readonly Geometry SendToBackIcon = Geometry.Parse("M10,3 H21 V14 H10 Z M7,7 H3 V21 H17 V17");
 
     private readonly Func<IReadOnlyList<TouchPoint>, Task> _sendTouch;
     private readonly Func<PenFlags, int, int, int, Task> _sendPen;
@@ -45,7 +46,8 @@ public sealed class TouchOverlayWindow : Window
     private readonly MultiTouchTracker _tracker = new();
     private readonly PenTracker _penTracker = new();
     private readonly RawTouchReader _reader;
-    private readonly MpvVideoLocator _locator;
+    private readonly IDisposable _locator;
+    private readonly bool _wireless;
     private readonly DispatcherTimer _keepAlive;
     private readonly List<Pending> _queue = [];
     private readonly Stopwatch _sinceTouchSent = Stopwatch.StartNew();
@@ -54,8 +56,9 @@ public sealed class TouchOverlayWindow : Window
 
     public TouchOverlayWindow(Func<IReadOnlyList<TouchPoint>, Task> sendTouch, Func<PenFlags, int, int, int, Task> sendPen,
         Func<IReadOnlyList<KeyTap>, Task> sendKeys, Action stopCapture, Action<string> log, string targetName,
-        Func<int?> viewerProcessId)
+        Func<int?> viewerProcessId, bool wireless)
     {
+        _wireless = wireless;
         _sendTouch = sendTouch;
         _sendPen = sendPen;
         _sendKeys = sendKeys;
@@ -68,21 +71,30 @@ public sealed class TouchOverlayWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false;
         SizeToContent = SizeToContent.Height;
-        // Room for the navigation buttons centred and two action buttons on the right.
-        Width = 720;
+        // Room for the navigation buttons centred and two (wireless: three) action buttons on the right.
+        Width = wireless ? 800 : 720;
 
         var pauseButton = MakeButton("Stop capture", PauseIcon);
         pauseButton.Click += (_, _) => stopCapture();
 
-        var fullScreenButton = MakeButton("Full screen or window", FullScreenIcon);
+        var fullScreenButton = MakeButton(wireless ? "Fill the screen or restore the window" : "Full screen or window", FullScreenIcon);
         fullScreenButton.Click += (_, _) => _ = ToggleFullScreenAsync();
 
         var actions = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Children = { fullScreenButton, pauseButton }
+            HorizontalAlignment = HorizontalAlignment.Right
         };
+        // Minimising Wireless Display ends the cast; putting it behind other windows does not.
+        if (wireless)
+        {
+            var backButton = MakeButton("Send Wireless Display behind other windows", SendToBackIcon);
+            backButton.Click += (_, _) => _ = Task.Run(() =>
+                log(WirelessDisplay.SendToBack() ? "wireless display: sent to back" : "wireless display: no window to send back"));
+            actions.Children.Add(backButton);
+        }
+        actions.Children.Add(fullScreenButton);
+        actions.Children.Add(pauseButton);
 
         // Says where input is going, so a glance at the bar answers "is this on?".
         var status = new StackPanel
@@ -133,7 +145,9 @@ public sealed class TouchOverlayWindow : Window
 
         Loaded += (_, _) => PlaceBar();
         VideoRegion.Changed += OnVideoMoved;
-        _locator = new MpvVideoLocator(viewerProcessId, message => log($"viewer: {message}"));
+        _locator = wireless
+            ? new WirelessDisplayLocator(message => log($"viewer: {message}"))
+            : new MpvVideoLocator(viewerProcessId, message => log($"viewer: {message}"));
         _reader = new RawTouchReader(OnFrame, OnPen, log);
 
         _keepAlive = new DispatcherTimer(TimeSpan.FromMilliseconds(KeepAliveMs / 2), DispatcherPriority.Input,
@@ -149,6 +163,14 @@ public sealed class TouchOverlayWindow : Window
     /// </summary>
     private async Task ToggleFullScreenAsync()
     {
+        if (_wireless)
+        {
+            // Not the app's own full screen, which ends the cast when another app is switched to.
+            var result = await Task.Run(WirelessDisplay.ToggleFill);
+            _log($"wireless display: {result}");
+            return;
+        }
+
         if (!await MpvVideoLocator.SendCommandAsync("cycle", "fullscreen"))
             _log("viewer: full screen needs the mpv PhoneDeck starts (or --input-ipc-server); nothing changed");
     }
@@ -164,7 +186,9 @@ public sealed class TouchOverlayWindow : Window
         var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
         var video = VideoRegion.Resolve();
         var screenWidth = ScreenMetrics.PrimaryWidth / scale;
-        var screenHeight = ScreenMetrics.PrimaryHeight / scale;
+        // The Wireless Display window never hides the taskbar, so the bar stays above it; mpv's
+        // full screen does hide it.
+        var screenHeight = _wireless ? SystemParameters.WorkArea.Bottom : ScreenMetrics.PrimaryHeight / scale;
         var videoTop = video.Top / scale;
         var videoBottom = (video.Top + video.Height) / scale;
         var below = screenHeight - videoBottom;
@@ -248,6 +272,8 @@ public sealed class TouchOverlayWindow : Window
 
     private void OnFrame(IReadOnlyList<RawContact> frame)
     {
+        // The wireless display sends touch to the phone itself; sending it too would double it.
+        if (_wireless) return;
         var onScreen = frame.Select(contact =>
         {
             var (x, y) = ToScreen(contact.X, contact.Y);

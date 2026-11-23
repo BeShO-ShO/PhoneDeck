@@ -183,6 +183,7 @@ public static class CaptureSession
     /// same hotkey drops to the local target instead and capture keeps running.
     /// </param>
     /// <param name="chordSwitch">Whether Ctrl+D+C switches target as well as Ctrl+Alt+CapsLock.</param>
+    /// <param name="penGoesToHost">Null means the same as <paramref name="touchGoesToHost"/>.</param>
     /// <param name="evenPacing">
     /// Read per report like <paramref name="mouseIntervalMs"/>. Null means on.
     /// See <see cref="PointerResampler"/>.
@@ -197,13 +198,15 @@ public static class CaptureSession
         bool chordSwitch = true,
         bool touchGoesToHost = false,
         bool capsLockSwitch = true,
-        Func<bool>? evenPacing = null)
+        Func<bool>? evenPacing = null,
+        bool? penGoesToHost = null)
     {
         evenPacing ??= () => true;
         using var capture = new InputCapture { Verbose = verbose };
         capture.SetChordSwitch(chordSwitch);
         capture.SetCapsLockSwitch(capsLockSwitch);
         capture.SetTouchGoesToHost(touchGoesToHost);
+        capture.SetPenGoesToHost(penGoesToHost ?? touchGoesToHost);
         var stopped = new TaskCompletionSource();
         using var registration = cancellationToken.Register(() => stopped.TrySetResult());
 

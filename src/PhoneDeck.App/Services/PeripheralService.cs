@@ -392,6 +392,12 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
         var peripheral = _peripheral;
         var token = _captureCancellation.Token;
+        // The wireless display carries touch itself, so PhoneDeck must not send it too; the pen
+        // it ignores, so PhoneDeck sends that.
+        var settings = AppSettings.Instance;
+        var wireless = settings.UseWirelessDisplay;
+        var touchGoesToHost = !wireless && settings.TouchLayerEnabled;
+        var penGoesToHost = wireless || settings.TouchLayerEnabled;
 
         // Ctrl+Alt+Q ends the session, so the toggle has to follow the hotkey rather than the click.
         _ = Task.Run(async () =>
@@ -400,9 +406,10 @@ public sealed class PeripheralService : INotifyPropertyChanged
             {
                 await CaptureSession.RunAsync(peripheral, Append, verbose: false, () => PointerIntervalMs,
                     stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch,
-                    touchGoesToHost: AppSettings.Instance.TouchLayerEnabled,
+                    touchGoesToHost: touchGoesToHost,
                     capsLockSwitch: AppSettings.Instance.EnableCapsLockSwitch,
-                    evenPacing: () => AppSettings.Instance.EvenPointerPacing);
+                    evenPacing: () => AppSettings.Instance.EvenPointerPacing,
+                    penGoesToHost: penGoesToHost);
             }
             catch (Exception ex)
             {

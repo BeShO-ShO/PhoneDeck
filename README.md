@@ -129,6 +129,30 @@ When making a Windows shortcut for these commands, make sure nothing follows the
 when pasting: a hidden line break at the end stops mpv starting from a shortcut, even though the
 same command works in a terminal.
 
+### Without a capture device: Windows Wireless Display
+
+DeX can also cast to the PC over Wi-Fi, using Windows' **Wireless Display** app (an optional
+Windows feature) as the receiver. In PhoneDeck's Settings, set **Show the phone's screen with**
+to **Wireless Display**. There is more picture delay than with a capture device.
+
+- **Touch** on the cast works on its own, through the cast. PhoneDeck does not send it, whatever
+  the touchscreen switch says, so touches don't arrive twice.
+- **Keyboard, mouse and pen** go through PhoneDeck over Bluetooth, as with mpv. The cast ignores
+  the mouse and pen, and Windows' "press Win+K to allow input" prompt does nothing on the
+  receiving PC.
+- Starting capture opens Wireless Display if it isn't open. PhoneDeck never closes it.
+- The **bar** always shows while capture is on, even with the touchscreen switch off. With a
+  capture device, the bar still follows the touchscreen switch.
+- **Don't minimise Wireless Display**: the cast ends at once. Covering it with other windows is
+  fine. The bar's **send-to-back button** puts it behind your other windows instead.
+- **Don't use its own full screen** (Win+Shift+Enter) if you switch apps: switching away from it
+  ends the cast. The bar's **full-screen button** instead stretches the ordinary window so the
+  picture fills the screen above the taskbar, with the title bar just off screen. Press it again to put the window
+  back. PhoneDeck only moves and resizes the window, the same as dragging it, and puts it back when
+  PhoneDeck exits.
+- **Known issue:** while capture is on, the Windows pointer can stay visible over the picture.
+  Windows hides it after a touch on the screen, until the mouse is used on the PC again.
+
 ## Requirements
 
 - Windows 10 version 2004 or later, on x64 or ARM64.

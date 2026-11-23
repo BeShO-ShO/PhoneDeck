@@ -86,6 +86,21 @@
       <ui:ToggleSwitch IsChecked="{Binding EnableCtrlDCSwitch, Mode=TwoWay}" />
     </ui:CardControl>
 
+    <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,8">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Show the phone's screen with" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Wireless Display: cast DeX to this PC. Touch works on its own; PhoneDeck adds the keyboard, mouse and pen, and the bar's buttons fill the screen or send the window back (minimising it ends the cast). Applies the next time capture starts." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <ComboBox x:Name="DisplayModeBox" MinWidth="200" SelectionChanged="OnDisplayModeChanged">
+        <ComboBoxItem Content="Capture device (mpv)" />
+        <ComboBoxItem Content="Wireless Display" />
+      </ComboBox>
+    </ui:CardControl>
+
     <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
       <ui:CardControl.Header>
         <StackPanel>

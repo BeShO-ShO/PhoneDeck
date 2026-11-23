@@ -257,6 +257,36 @@ public sealed class InputCaptureTests
     }
 
     [Fact]
+    public void An_unconfined_cursor_parks_in_the_middle_of_the_main_screen()
+    {
+        // Unconfined, the clip area is the whole desktop, which can include a second monitor.
+        Assert.Equal((1440, 960), InputCapture.ParkPoint(2880, 1920, 0, 0, 2880, 1920));
+        Assert.Equal((1440, 960), InputCapture.ParkPoint(2880, 1920, -1920, 0, 2880, 1920));
+    }
+
+    [Fact]
+    public void A_confined_cursor_parks_inside_the_allowed_area()
+    {
+        // The Wireless Display case: confined to the top part of the screen. Parking at the
+        // screen's middle would be clamped to the area's bottom edge and read as a steady pull up.
+        var (x, y) = InputCapture.ParkPoint(2880, 1920, 100, 0, 2780, 600);
+        Assert.Equal((1440, 300), (x, y));
+        Assert.InRange(y, 0, 599);
+    }
+
+    [Fact]
+    public void A_confinement_off_the_main_screen_is_used_as_it_is()
+    {
+        Assert.Equal((-960, 540), InputCapture.ParkPoint(2880, 1920, -1920, 0, 0, 1080));
+    }
+
+    [Fact]
+    public void A_one_pixel_confinement_parks_on_that_pixel()
+    {
+        Assert.Equal((50, 70), InputCapture.ParkPoint(2880, 1920, 50, 70, 51, 71));
+    }
+
+    [Fact]
     public void Keys_held_when_capture_starts_are_released_on_windows()
     {
         // Ctrl+Alt+Q started capture: Ctrl, Alt and Q are still down as the hook goes in.

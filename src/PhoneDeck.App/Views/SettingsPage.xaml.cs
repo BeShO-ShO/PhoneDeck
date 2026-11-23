@@ -21,6 +21,7 @@ public partial class SettingsPage : Page
 
         SwitchGestureToggle.IsChecked =
             SwitchGestureOptions.Load(AppPaths.SwitchGestureConfig).Enabled;
+        DisplayModeBox.SelectedIndex = AppSettings.Instance.UseWirelessDisplay ? 1 : 0;
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
     }
@@ -54,6 +55,11 @@ public partial class SettingsPage : Page
     {
         if (_gestureWatcher is { } watcher)
             SwitchGestureToggle.IsChecked = watcher.Current.Enabled;
+    }
+
+    private void OnDisplayModeChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (DisplayModeBox.SelectedIndex >= 0) AppSettings.Instance.UseWirelessDisplay = DisplayModeBox.SelectedIndex == 1;
     }
 
     private void OnAutoStartChanged(object sender, RoutedEventArgs e) =>

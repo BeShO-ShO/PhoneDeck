@@ -68,6 +68,19 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _evenPointerPacing, value)) Save(); }
     }
 
+    private bool _useWirelessDisplay;
+
+    /// <summary>
+    /// How the phone's screen is shown: false for a capture device in mpv, true for Windows'
+    /// Wireless Display app. With the wireless display, touch is native and PhoneDeck sends the
+    /// keyboard, mouse and pen. Applies the next time capture starts.
+    /// </summary>
+    public bool UseWirelessDisplay
+    {
+        get => _useWirelessDisplay;
+        set { if (Set(ref _useWirelessDisplay, value)) Save(); }
+    }
+
     private bool _openViewerWithCapture = true;
 
     /// <summary>Whether starting capture also opens mpv on <see cref="ViewerVideoDevice"/>.</summary>

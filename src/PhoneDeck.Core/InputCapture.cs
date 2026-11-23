@@ -41,7 +41,9 @@ public sealed class InputCapture : IDisposable
     private uint _threadId;
     private MouseButtons _buttons;
     private MouseButtons _localButtons;
-    private int _centerX, _centerY;
+    // Where the cursor was last parked: pointer motion is measured from here.
+    private volatile int _centerX, _centerY;
+    private int _screenWidth, _screenHeight;
     private int _keyboardEvents, _mouseEvents, _rearms;
     private bool _switchLatched;
     private bool _capsLockSwitchLatched;
@@ -51,6 +53,7 @@ public sealed class InputCapture : IDisposable
     private volatile bool _chordSwitchEnabled = true;
     private volatile bool _capsLockSwitchEnabled = true;
     private volatile bool _touchGoesToHost;
+    private volatile bool _penGoesToHost;
     // Swapped from the settings-watcher thread while the hook thread reads it, so the field has
     // to be volatile even though the reference assignment itself is atomic.
     private volatile ShakeGestureDetector? _gesture;
@@ -76,7 +79,7 @@ public sealed class InputCapture : IDisposable
     {
         if (_passThrough == value) return;
         _passThrough = value;
-        if (!value && _running) SetCursorPos(_centerX, _centerY);
+        if (!value && _running) ParkCursor();
         // A target change invalidates gesture state: the shake that caused it is usually still
         // being performed, and local deltas need a fresh reference point either way.
         _gesture?.Reset();
@@ -101,6 +104,22 @@ public sealed class InputCapture : IDisposable
     /// them are dropped instead of clicking whatever is showing the video.
     /// </summary>
     public void SetTouchGoesToHost(bool enabled) => _touchGoesToHost = enabled;
+
+    /// <summary>
+    /// Like <see cref="SetTouchGoesToHost"/> for the pen alone. Touch on its own setting lets
+    /// the wireless display keep its native touch while the pen goes to the phone over Bluetooth.
+    /// </summary>
+    public void SetPenGoesToHost(bool enabled) => _penGoesToHost = enabled;
+
+    /// <summary>Whether a promoted mouse event is to be dropped rather than reach the window under it.</summary>
+    internal static bool DropsPromoted(bool isPen, bool touchGoesToHost, bool penGoesToHost, bool passThrough, bool onVideo) =>
+        !passThrough && onVideo && (isPen ? penGoesToHost : touchGoesToHost);
+
+    /// <summary>
+    /// Touch-promoted mouse events set bit 0x80 of the signature (0xFF515780, the value often
+    /// called MOUSEEVENTF_FROMTOUCH); pen-promoted ones leave it clear.
+    /// </summary>
+    internal static bool IsPenPromoted(IntPtr extraInfo) => IsTouchPromoted(extraInfo) && ((long)extraInfo & 0x80L) == 0;
 
     /// <summary>
     /// A low-level mouse hook delays every pointer event system-wide, so it is only installed
@@ -237,9 +256,11 @@ public sealed class InputCapture : IDisposable
         KeepTimerPrecise();
         timeBeginPeriod(1);
 
-        _centerX = GetSystemMetrics(0) / 2;
-        _centerY = GetSystemMetrics(1) / 2;
-        if (!_passThrough) SetCursorPos(_centerX, _centerY);
+        _screenWidth = GetSystemMetrics(0);
+        _screenHeight = GetSystemMetrics(1);
+        _centerX = _screenWidth / 2;
+        _centerY = _screenHeight / 2;
+        if (!_passThrough) ParkCursor();
 
         _keyboardProc = KeyboardHookProc;
         _mouseProc = MouseHookProc;
@@ -576,7 +597,8 @@ public sealed class InputCapture : IDisposable
         if (IsTouchPromoted(data.dwExtraInfo))
         {
             // Outside the video it stays a normal tap, which is how the button bar gets its clicks.
-            if (_touchGoesToHost && !_passThrough && VideoRegion.IsOnVideo(data.pt.x, data.pt.y))
+            if (DropsPromoted(IsPenPromoted(data.dwExtraInfo), _touchGoesToHost, _penGoesToHost, _passThrough,
+                    VideoRegion.IsOnVideo(data.pt.x, data.pt.y)))
                 return 1;
 
             // It moves the real cursor off centre, so the next real delta would be a huge jump.
@@ -613,7 +635,7 @@ public sealed class InputCapture : IDisposable
         if (_recenterPending && (int)wParam == WM_MOUSEMOVE)
         {
             _recenterPending = false;
-            SetCursorPos(_centerX, _centerY);
+            ParkCursor();
             return 1;
         }
 
@@ -626,7 +648,7 @@ public sealed class InputCapture : IDisposable
                 {
                     if (Verbose && _mouseEvents <= 10) Log?.Invoke($"  [mouse] move {dx},{dy}");
                     MouseReport?.Invoke(_buttons, dx, dy, 0);
-                    SetCursorPos(_centerX, _centerY);
+                    ParkCursor();
                     TrackGesture(dx, dy);
                 }
                 break;
@@ -666,6 +688,50 @@ public sealed class InputCapture : IDisposable
     private delegate IntPtr LowLevelProc(int code, IntPtr wParam, IntPtr lParam);
 
     private delegate void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+    /// <summary>
+    /// Puts the cursor where pointer motion is measured from: normally the middle of the screen.
+    /// Another app can confine the cursor to part of the screen (Windows' Wireless Display
+    /// window does), and Windows then clamps SetCursorPos to that area. Measured from the
+    /// screen's middle, every move then looked like a steady pull towards that area, which
+    /// pinned the phone's pointer to the top. So it parks in the middle of the area the cursor
+    /// is allowed in, and measures from wherever it really ended up.
+    /// </summary>
+    private void ParkCursor()
+    {
+        var (x, y) = GetClipCursor(out var clip)
+            ? ParkPoint(_screenWidth, _screenHeight, clip.left, clip.top, clip.right, clip.bottom)
+            : (_screenWidth / 2, _screenHeight / 2);
+        SetCursorPos(x, y);
+        if (GetCursorPos(out var actual)) (x, y) = (actual.x, actual.y);
+        _centerX = x;
+        _centerY = y;
+    }
+
+    /// <summary>
+    /// The middle of the part of the main screen the cursor may enter. A confinement that misses
+    /// the main screen entirely is used as it is; an unconfined cursor gives the screen's middle.
+    /// </summary>
+    internal static (int X, int Y) ParkPoint(int screenWidth, int screenHeight,
+        int clipLeft, int clipTop, int clipRight, int clipBottom)
+    {
+        var left = Math.Max(0, clipLeft);
+        var top = Math.Max(0, clipTop);
+        var right = Math.Min(screenWidth, clipRight);
+        var bottom = Math.Min(screenHeight, clipBottom);
+        if (right <= left || bottom <= top) (left, top, right, bottom) = (clipLeft, clipTop, clipRight, clipBottom);
+        // Same middle as before for an unconfined cursor; always inside, as right/bottom are exclusive.
+        return ((left + right) / 2, (top + bottom) / 2);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int left; public int top; public int right; public int bottom; }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetClipCursor(out RECT rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT point);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT { public int x; public int y; }
