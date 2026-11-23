@@ -114,8 +114,9 @@ For less picture delay, which you notice most with the mouse pointer, PhoneDeck 
 with `--swapchain-depth=1 --video-latency-hacks=yes --d3d11-sync-interval=0`. These keep fewer
 frames queued, always show the newest captured frame, and stop waiting for the display's
 refresh (fast motion may show a faint tear). On the development setup they made the pointer
-noticeably easier to steer, together with **Enhance pointer precision** turned on in Windows'
-mouse settings.
+noticeably easier to steer, together with **Enhance pointer precision** turned on in the
+phone's own mouse settings (Android, not Windows: on a Samsung phone, look under Settings for
+the mouse and trackpad options, next to pointer speed).
 
 While input goes to the phone, mpv hides the Windows pointer over the picture and ignores double
 taps. When capture stops, PhoneDeck tells mpv (over the same pipe) to hide the pointer only after a
