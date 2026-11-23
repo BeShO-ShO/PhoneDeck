@@ -174,7 +174,8 @@ to **Wireless Display**. There is more picture delay than with a capture device.
   video output.
 
 Developed and tested on a Surface Pro with a Snapdragon X processor (ARM64) and a Surface Go 3
-(x64), with a Samsung Galaxy phone on Android 16 in DeX. Other combinations are untested.
+(x64), with a Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX. Other combinations are
+untested.
 
 ## Using PhoneDeck
 
