@@ -19,6 +19,8 @@ It is fully functional in either of two ways of showing the phone's screen:
 Switch between them on PhoneDeck's Home page. Either way, the keyboard, mouse, touch and pen
 all work, with a button bar for Android's navigation buttons.
 
+![Samsung DeX shown on a Windows PC through the Wireless Display app](docs/screenshots/dex-wireless-display.png)
+
 ## Credits
 
 PhoneDeck is a derivative of **[windows-ble-hid](https://github.com/abhishek-raj/windows-ble-hid)
@@ -188,6 +190,8 @@ untested.
    **Ctrl+Alt+Q** (or **Start capture**). Press it again to return input to the PC.
 
 The window has three views:
+
+<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: two connected phones, Start capture, where input goes, and the choice between a capture device and Wireless Display" width="360">
 
 - **Home** — the phone's connection and link speed, Start capture, where input goes, and how
   the phone's screen is shown (capture device or Wireless Display), with only the options for
