@@ -3,7 +3,12 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+      xmlns:conv="clr-namespace:PhoneDeck.App.Converters"
       Title="Settings">
+
+  <Page.Resources>
+    <conv:InverseBoolConverter x:Key="InverseBool" />
+  </Page.Resources>
 
   <StackPanel Margin="16,4,16,16">
     <ui:TextBlock Text="Control how PhoneDeck starts and what happens when the window is closed."
@@ -95,10 +100,12 @@
                         Text="Wireless Display: cast DeX to this PC. Touch works on its own; PhoneDeck adds the keyboard, mouse and pen, and the bar's buttons fill the screen or send the window back (minimising it ends the cast). Applies the next time capture starts." />
         </StackPanel>
       </ui:CardControl.Header>
-      <ComboBox x:Name="DisplayModeBox" MinWidth="200" SelectionChanged="OnDisplayModeChanged">
-        <ComboBoxItem Content="Capture device (mpv)" />
-        <ComboBoxItem Content="Wireless Display" />
-      </ComboBox>
+      <StackPanel>
+        <RadioButton GroupName="SettingsDisplayRoute" Content="Capture device (mpv)" Margin="0,0,0,4"
+                     IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
+        <RadioButton GroupName="SettingsDisplayRoute" Content="Wireless Display"
+                     IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay}" />
+      </StackPanel>
     </ui:CardControl>
 
     <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">

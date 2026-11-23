@@ -98,28 +98,51 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Starts mpv with capture. Device in Settings." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding OpenViewerWithCapture, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
-    </ui:CardControl>
+    <!-- How the phone's screen is shown, and below it only the options that apply to that way. -->
+    <ui:TextBlock Text="Show the phone's screen with" FontTypography="BodyStrong" Margin="0,4,0,8" />
+    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+      <RadioButton GroupName="HomeDisplayRoute" Content="Capture device" Margin="0,0,24,0"
+                   IsChecked="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
+      <RadioButton GroupName="HomeDisplayRoute" Content="Wireless Display"
+                   IsChecked="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+    </StackPanel>
 
-    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}">
+    <StackPanel Visibility="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource InverseBoolToVisibility}}">
+      <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Starts mpv with capture. Device in Settings." />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <ui:ToggleSwitch IsChecked="{Binding OpenViewerWithCapture, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      </ui:CardControl>
+
+      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Touch and pen on the video go to the phone, with a button bar below it." />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      </ui:CardControl>
+    </StackPanel>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Cast24}"
+                    Visibility="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
       <ui:CardControl.Header>
         <StackPanel>
-          <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
+          <ui:TextBlock Text="Cast DeX to this PC" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Touch and pen on the video go to the phone." />
+                        Text="Touch works through the cast; PhoneDeck adds the keyboard, mouse and pen. Don't minimise Wireless Display: use the bar's buttons to fill the screen or send it back." />
         </StackPanel>
       </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
     </ui:CardControl>
 
     <ui:Button Appearance="Transparent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"

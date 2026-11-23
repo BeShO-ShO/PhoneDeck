@@ -2,14 +2,22 @@
 
 <img src="src/PhoneDeck.App/Assets/phonedeck.png" alt="PhoneDeck icon" width="104" align="right">
 
-Use a Windows PC's **keyboard, mouse and touchscreen** to control an Android phone over
-Bluetooth, while the phone's screen is shown on the PC through a **USB video capture device**.
+**A DeX alternative for Windows.** PhoneDeck turns a Windows PC into the monitor, keyboard,
+mouse, touchscreen and pen for an Android phone running a desktop mode such as Samsung DeX.
+The PC's input reaches the phone over Bluetooth, as a real keyboard and mouse would, so
+nothing needs installing on the phone and developer options stay off.
 
-PhoneDeck is built for one fairly specific setup: an Android phone running a desktop mode
-(such as Samsung DeX) whose video output goes into a capture device plugged into a Windows PC,
-and is watched full screen in a video player such as mpv. The PC becomes the phone's monitor
-*and* its keyboard, mouse and touchscreen. If that is not your setup, the original project it
-is based on (below) may suit you better.
+It is fully functional in either of two ways of showing the phone's screen:
+
+- **Wireless:** the phone casts DeX to Windows' **Wireless Display** app over Wi-Fi. No extra
+  hardware is needed.
+- **Capture device:** the phone's USB-C video output goes into a **USB video capture device**,
+  shown on the PC in mpv. It has less delay, and it also shows **work apps that block wireless
+  casting**: apps in a managed work profile often refuse to appear on a cast screen, but a
+  wired display shows them like any monitor.
+
+Switch between them on PhoneDeck's Home page. Either way, the keyboard, mouse, touch and pen
+all work, with a button bar for Android's navigation buttons.
 
 ## Credits
 
@@ -26,7 +34,8 @@ His original README, with the detailed technical background, is kept as
 [docs/ORIGINAL-README.md](docs/ORIGINAL-README.md), and his developer notes are in
 [DEVELOPMENT.md](DEVELOPMENT.md). Paths in both were updated for the rename.
 
-PhoneDeck adds the capture-device workflow on top. See [What PhoneDeck adds](#what-phonedeck-adds).
+PhoneDeck adds the DeX workflow on top: the capture-device and wireless display routes, touch
+and pen, and the button bar. See [What PhoneDeck adds](#what-phonedeck-adds).
 
 ## How the setup fits together
 
@@ -159,7 +168,9 @@ to **Wireless Display**. There is more picture delay than with a capture device.
 - A Bluetooth radio that supports the **LE peripheral role**. Check in PhoneDeck under
   Details → Logs for `Peripheral=True`.
 - An Android phone that accepts Bluetooth keyboards, mice and touchscreens.
-- For the touch and viewing workflow: a USB video capture device and a phone with video output.
+- To show the phone's screen, either Windows' **Wireless Display** app (an optional Windows
+  feature) with a phone that can cast DeX, or a USB video capture device and a phone with
+  video output.
 
 Developed and tested on a Surface Pro with a Snapdragon X processor (ARM64) and a Surface Go 3
 (x64), with a Samsung Galaxy phone on Android 16 in DeX. Other combinations are untested.
@@ -176,14 +187,15 @@ Developed and tested on a Surface Pro with a Snapdragon X processor (ARM64) and 
 
 The window has three views:
 
-- **Home** — the phone's connection and link speed, Start capture, where input goes, and the
-  **Use the touchscreen** switch.
+- **Home** — the phone's connection and link speed, Start capture, where input goes, and how
+  the phone's screen is shown (capture device or Wireless Display), with only the options for
+  the chosen way.
 - **Details** (ⓘ) — the Bluetooth service, pointer pacing, shortcuts and logs.
 - **Settings** (⚙) — startup, closing behaviour, and optional switch keys.
 
-While capture is on with touch enabled, a small bar sits just below the video with
-**Split screen, Recents, Home and Back** buttons, a button that switches mpv between full screen
-and a window, and a pause button that turns capture off.
+While capture is on (with a capture device, when touch is enabled), a small bar sits just below
+the video with **Split screen, Recents, Home and Back** buttons, a full-screen button, and a
+pause button that turns capture off. With Wireless Display it also has a send-to-back button.
 
 ## What PhoneDeck adds
 
@@ -194,7 +206,9 @@ Compared with windows-ble-hid v0.6.0:
   and mapped onto wherever the video is.
 - **Pen input**: a pen on the PC's screen is sent as a stylus, with hover, pressure, the barrel
   button and the eraser end.
-- **Starts mpv** on the capture device when capture starts, if you choose a device in Settings.
+- **Two ways to show the phone**: a capture device in mpv, which PhoneDeck starts when capture
+  starts, or Windows' Wireless Display with DeX cast over Wi-Fi (native touch, PhoneDeck's
+  keyboard, mouse and pen, and fill-screen and send-to-back buttons that keep the cast alive).
 - **Navigation bar** for Android: Split screen, Recents, Home and Back, sent as keyboard
   shortcuts because edge gestures can't be performed by an external touchscreen.
 - **Ctrl+Alt+Q toggles** capture on and off, and always turns on to the phone.
