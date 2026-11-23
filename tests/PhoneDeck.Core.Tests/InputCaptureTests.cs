@@ -8,6 +8,7 @@ public sealed class InputCaptureTests
     private const int CapsLock = 0x14;
     private const int LeftControl = 0xA2;
     private const int LeftAlt = 0xA4;
+    private const int RightAlt = 0xA5;
 
     [Fact]
     public void Hook_timing_separates_event_age_from_callback_duration()
@@ -253,6 +254,37 @@ public sealed class InputCaptureTests
 
         Assert.Equal(1, stops);
         Assert.Equal(0, switches);
+    }
+
+    [Fact]
+    public void Keys_held_when_capture_starts_are_released_on_windows()
+    {
+        // Ctrl+Alt+Q started capture: Ctrl, Alt and Q are still down as the hook goes in.
+        using var capture = new InputCapture();
+        capture.SeedLocalKeys([LeftControl, RightAlt, 0x51]);
+
+        // Their releases must reach Windows (false = not swallowed), or it keeps them held.
+        Assert.False(capture.HandleKeyboardEvent(0x51, false));
+        Assert.False(capture.HandleKeyboardEvent(RightAlt, false));
+        Assert.False(capture.HandleKeyboardEvent(LeftControl, false));
+
+        // Keys pressed after that are captured as usual, release included.
+        Assert.True(capture.HandleKeyboardEvent(RightAlt, true));
+        Assert.True(capture.HandleKeyboardEvent(RightAlt, false));
+    }
+
+    [Fact]
+    public void A_seeded_key_does_not_reach_the_phone_as_held()
+    {
+        using var capture = new InputCapture();
+        var reports = new List<KeyModifiers>();
+        capture.KeyboardReport += (modifiers, _) => reports.Add(modifiers);
+        capture.SeedLocalKeys([LeftControl]);
+
+        capture.HandleKeyboardEvent(LeftControl, false);
+        capture.HandleKeyboardEvent(0x41, true);
+
+        Assert.All(reports, modifiers => Assert.Equal(KeyModifiers.None, modifiers));
     }
 
     [Fact]

@@ -108,6 +108,11 @@ refresh (fast motion may show a faint tear). On the development setup they made 
 noticeably easier to steer, together with **Enhance pointer precision** turned on in Windows'
 mouse settings.
 
+While input goes to the phone, mpv hides the Windows pointer over the picture and ignores double
+taps. When capture stops, PhoneDeck tells mpv (over the same pipe) to hide the pointer only after a
+second without movement, and to switch full screen on a double tap or double click again, so mpv
+is usable with the mouse or touch alone.
+
 To switch mpv between full screen and a window while capture is on, tap the **full-screen
 button** on the bar, next to Stop. This needs mpv's control pipe, so it works with the mpv
 PhoneDeck starts or one started with `--input-ipc-server=\\.\pipe\phonedeck-mpv`.

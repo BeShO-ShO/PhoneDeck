@@ -72,6 +72,49 @@ public sealed class ViewerService
         }
     }
 
+    /// <summary>mpv's cursor-autohide while input goes to the phone, and while it does not.</summary>
+    public const string PointerHiddenWhileCapturing = "always";
+    public const string PointerHiddenWhenIdle = "1000";
+
+    /// <summary>What a double tap or double click on the picture does in each mode.</summary>
+    public const string DoubleTapWhileCapturing = "ignore";
+    public const string DoubleTapWhenIdle = "cycle fullscreen";
+
+    private int _modeRequest;
+
+    /// <summary>
+    /// Fits mpv to whether input is going to the phone. Works with any mpv on PhoneDeck's control
+    /// pipe, including one from your own shortcut.
+    /// <list type="bullet">
+    /// <item>Pointer: while capturing, PhoneDeck keeps parking the Windows pointer in the middle of
+    /// the screen, over the picture, so mpv hides it there. Otherwise mpv hides it only once it
+    /// stops moving, or it vanishes over mpv when you want to use it.</item>
+    /// <item>Double tap: while capturing it belongs to the phone, so mpv ignores it. Otherwise it
+    /// switches full screen, mpv's usual behaviour, so touch alone can get in and out of it.</item>
+    /// </list>
+    /// </summary>
+    public void SetCaptureMode(bool capturing)
+    {
+        var request = Interlocked.Increment(ref _modeRequest);
+        var pointer = capturing ? PointerHiddenWhileCapturing : PointerHiddenWhenIdle;
+        var doubleTap = capturing ? DoubleTapWhileCapturing : DoubleTapWhenIdle;
+        _ = Task.Run(async () =>
+        {
+            // An mpv that has just started needs a moment before its pipe answers. A newer
+            // request (capture toggled again) takes over from this one.
+            for (var attempt = 0; attempt < 10 && request == Volatile.Read(ref _modeRequest); attempt++)
+            {
+                if (await MpvVideoLocator.SendCommandAsync("set", "cursor-autohide", pointer))
+                {
+                    // keybind replaces the input file's binding for the double click.
+                    await MpvVideoLocator.SendCommandAsync("keybind", "MBTN_LEFT_DBL", doubleTap);
+                    return;
+                }
+                await Task.Delay(300);
+            }
+        });
+    }
+
     /// <summary>The mpv command line, also shown in Settings so it can be copied to a shortcut.</summary>
     public static List<string> Arguments(string video, string? audio)
     {
@@ -84,7 +127,8 @@ public sealed class ViewerService
             "--cache=no",
             "--osc=no",
             "--fs",
-            "--cursor-autohide=always",
+            // Started for capture, so hidden; SetCaptureMode relaxes it when capture stops.
+            $"--cursor-autohide={PointerHiddenWhileCapturing}",
             // A pen stroke reaches mpv as a left-button drag, which by default moves a windowed
             // mpv along with the stroke. The title bar still moves it.
             "--no-window-dragging",

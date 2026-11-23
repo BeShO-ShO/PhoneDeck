@@ -143,6 +143,7 @@ public partial class App : Application
             // mpv stays open when capture stops, so the phone can still be watched; it closes
             // with PhoneDeck.
             if (ViewerService.Instance.EnsureRunning(peripheral.LogApp) is { } problem) Tray?.ShowMessage(problem);
+            ViewerService.Instance.SetCaptureMode(true);
 
             if (!AppSettings.Instance.TouchLayerEnabled) return;
 
@@ -156,6 +157,7 @@ public partial class App : Application
         else if (!peripheral.IsRedirecting && _redirectUiActive)
         {
             _redirectUiActive = false;
+            if (!_exiting) ViewerService.Instance.SetCaptureMode(false);
             _touchLayer?.Close();
             _touchLayer = null;
             if (_restoreWindowAfterRedirect && !_exiting) ShowMainWindow();

@@ -258,6 +258,12 @@ public sealed class TouchInputTests
     public void Mpv_commands_are_one_json_line()
     {
         Assert.Equal("{\"command\":[\"cycle\",\"fullscreen\"]}\n", MpvVideoLocator.CommandLine("cycle", "fullscreen"));
+        // "set" parses its value like the command line, so "1000" reaches mpv as a number.
+        Assert.Equal("{\"command\":[\"set\",\"cursor-autohide\",\"1000\"]}\n",
+            MpvVideoLocator.CommandLine("set", "cursor-autohide", "1000"));
+        // keybind takes the whole command as one argument.
+        Assert.Equal("{\"command\":[\"keybind\",\"MBTN_LEFT_DBL\",\"cycle fullscreen\"]}\n",
+            MpvVideoLocator.CommandLine("keybind", "MBTN_LEFT_DBL", "cycle fullscreen"));
     }
 
     [Theory]

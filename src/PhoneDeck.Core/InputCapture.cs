@@ -156,6 +156,28 @@ public sealed class InputCapture : IDisposable
     private static bool IsPhysicallyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
 
     /// <summary>
+    /// Keys already held when the keyboard hook goes in, typically the Ctrl+Alt of the Ctrl+Alt+Q
+    /// that started capture. Windows saw them go down, so it must see them come up: swallowing
+    /// those releases left Windows believing Ctrl and Alt were still held until the next
+    /// Ctrl+Alt+Q, which stopping from the bar never pressed.
+    /// </summary>
+    internal void SeedLocalKeys(IEnumerable<int> virtualKeys)
+    {
+        foreach (var key in virtualKeys) _localPressedVirtualKeys.Add(key);
+    }
+
+    private static IEnumerable<int> HeldKeys()
+    {
+        for (var key = 0x08; key <= 0xFE; key++)
+        {
+            // The hook reports left and right modifiers separately (0xA0-0xA5), never the generic
+            // Shift, Ctrl and Alt codes, and mouse buttons have their own seeding.
+            if (key is 0x10 or 0x11 or 0x12) continue;
+            if (IsPhysicallyDown(key)) yield return key;
+        }
+    }
+
+    /// <summary>
     /// Enables or disables the pointer switch gesture. When enabled, shaking the pointer back
     /// and forth cycles the target the same way the host-switch hotkey does. Pass null to disable.
     /// </summary>
@@ -238,6 +260,7 @@ public sealed class InputCapture : IDisposable
         }
 
         var module = GetModuleHandle(null);
+        SeedLocalKeys(HeldKeys());
         _keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, _keyboardProc, module, 0);
         var keyboardError = Marshal.GetLastWin32Error();
         SyncMouseHook();

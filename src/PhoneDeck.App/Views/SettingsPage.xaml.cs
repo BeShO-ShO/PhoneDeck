@@ -98,6 +98,8 @@ public partial class SettingsPage : Page
         }
 
         var problem = ViewerService.Instance.EnsureRunning(PeripheralService.Instance.LogApp, evenIfSwitchedOff: true);
+        // mpv starts set up for capture; outside capture, give it the pointer and double tap back.
+        if (problem is null) ViewerService.Instance.SetCaptureMode(PeripheralService.Instance.IsRedirecting);
         ViewerStatus.Text = problem ?? (ViewerService.Instance.ProcessId is null
             ? "mpv is already open."
             : "Opened. Press f in mpv if it is not full screen.");
