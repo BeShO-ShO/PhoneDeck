@@ -392,12 +392,11 @@ public sealed class PeripheralService : INotifyPropertyChanged
 
         var peripheral = _peripheral;
         var token = _captureCancellation.Token;
-        // The wireless display carries touch itself, so PhoneDeck must not send it too; the pen
-        // it ignores, so PhoneDeck sends that.
+        // The Wireless Display app's cast carries touch itself, so PhoneDeck must not send it too;
+        // the pen it ignores, so PhoneDeck sends that. PhoneDeck's own receiver carries neither.
         var settings = AppSettings.Instance;
-        var wireless = settings.UseWirelessDisplay;
-        var touchGoesToHost = !wireless && settings.TouchLayerEnabled;
-        var penGoesToHost = wireless || settings.TouchLayerEnabled;
+        var touchGoesToHost = DisplayRoutes.SendsTouch(settings.DisplayRoute, settings.TouchLayerEnabled);
+        var penGoesToHost = DisplayRoutes.SendsPen(settings.DisplayRoute, settings.TouchLayerEnabled);
 
         // Ctrl+Alt+Q ends the session, so the toggle has to follow the hotkey rather than the click.
         _ = Task.Run(async () =>

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using PhoneDeck.App.Viewer;
 using PhoneDeck.Core;
 using Windows.Devices.Enumeration;
+using Windows.Media.Playback;
 
 namespace PhoneDeck.App.Services;
 
@@ -18,6 +19,9 @@ public sealed class ViewerService
 
     private Process? _process;
     private CaptureViewer? _builtIn;
+    // The open built-in window shows the cast rather than the capture device.
+    private bool _builtInIsCast;
+    private bool _capturing;
 
     private ViewerService()
     {
@@ -59,6 +63,10 @@ public sealed class ViewerService
     public string? EnsureRunning(Action<string> log, bool evenIfSwitchedOff = false)
     {
         var settings = AppSettings.Instance;
+        // The cast's window opens by itself when the phone connects; capture starting before
+        // that opens it to wait, so the picture lands where the bar and touch expect it.
+        if (settings.DisplayRoute == DisplayRoute.Cast) return EnsureCastWindow(CastService.Instance.CurrentPlayer, log);
+        if (_builtInIsCast) Stop();
         if (!settings.OpenViewerWithCapture && !evenIfSwitchedOff) return null;
         if (settings.ViewerVideoDevice is not { } video) return null;
         string? audio = null;
@@ -76,6 +84,7 @@ public sealed class ViewerService
             _builtIn?.Dispose();
             log($"viewer: opening the built-in viewer{(audio is null ? " without sound" : "")}");
             _builtIn = new CaptureViewer(video, audio, log);
+            _builtInIsCast = false;
             ApplyPicture();
             return _builtIn.IsOpen ? null : "PhoneDeck could not open its viewer window. See the log.";
         }
@@ -136,6 +145,7 @@ public sealed class ViewerService
     /// </summary>
     public void SetCaptureMode(bool capturing)
     {
+        _capturing = capturing;
         _builtIn?.SetCapturing(capturing);
         // The built-in viewer has no pipe; an mpv from your own shortcut still might.
         if (IsBuiltInOpen) return;
@@ -240,11 +250,46 @@ public sealed class ViewerService
         return await MpvVideoLocator.SendCommandAsync("cycle", "fullscreen");
     }
 
+    /// <summary>
+    /// Shows the cast (or black, waiting, for null) in the viewer window, opening it if needed.
+    /// UI thread. Returns a problem to show, or null.
+    /// </summary>
+    public string? ShowCast(MediaPlayer? player, Action<string> log)
+    {
+        // A cast arriving after the route changed away is not shown.
+        if (AppSettings.Instance.DisplayRoute != DisplayRoute.Cast) return null;
+        // The phone dropping out leaves an open window black; it never opens one.
+        if (player is null && !IsBuiltInOpen) return null;
+        return EnsureCastWindow(player, log);
+    }
+
+    private string? EnsureCastWindow(MediaPlayer? player, Action<string> log)
+    {
+        if (!(IsBuiltInOpen && _builtInIsCast))
+        {
+            _builtIn?.Dispose();
+            log("viewer: opening the cast window");
+            _builtIn = CaptureViewer.ForCast(log);
+            _builtInIsCast = true;
+            _builtIn.SetCapturing(_capturing);
+            if (!_builtIn.IsOpen) return "PhoneDeck could not open its viewer window. See the log.";
+        }
+        _builtIn!.ShowCast(player);
+        return null;
+    }
+
+    /// <summary>The cast's picture size, once the player knows it. UI thread.</summary>
+    public void SetCastVideoSize(int width, int height)
+    {
+        if (_builtInIsCast) _builtIn?.SetVideoSize(width, height);
+    }
+
     /// <summary>Closes the viewer PhoneDeck opened (its own window, or the mpv it started).</summary>
     public void Stop()
     {
         var builtIn = _builtIn;
         _builtIn = null;
+        _builtInIsCast = false;
         builtIn?.Dispose();
 
         var process = _process;

@@ -103,17 +103,17 @@
     <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,8">
       <ui:CardControl.Header>
         <StackPanel>
-          <ui:TextBlock Text="Show the phone's screen with" FontTypography="BodyStrong" />
+          <ui:TextBlock Text="Receive Wireless with" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Wireless Display: cast DeX to this PC. Touch works on its own; PhoneDeck adds the keyboard, mouse and pen, and the bar's buttons fill the screen or send the window back (minimising it ends the cast). Applies the next time capture starts." />
+                        Text="Used when Wireless is chosen on Home. PhoneDeck: cast DeX to this PC and PhoneDeck shows it in its own window, with the keyboard, mouse, touch and pen; Windows asks once to let PhoneDeck through the firewall. Wireless Display app: the backup, if PhoneDeck can't receive the cast on this PC." />
         </StackPanel>
       </ui:CardControl.Header>
       <StackPanel>
-        <RadioButton GroupName="SettingsDisplayRoute" Content="Capture device" Margin="0,0,0,4"
-                     IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
-        <RadioButton GroupName="SettingsDisplayRoute" Content="Wireless Display"
-                     IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay}" />
+        <RadioButton GroupName="SettingsWirelessReceiver" Content="PhoneDeck" Margin="0,0,0,4"
+                     IsChecked="{Binding WirelessIsPhoneDeck, Mode=TwoWay}" />
+        <RadioButton GroupName="SettingsWirelessReceiver" Content="Wireless Display app"
+                     IsChecked="{Binding WirelessIsApp, Mode=TwoWay}" />
       </StackPanel>
     </ui:CardControl>
 

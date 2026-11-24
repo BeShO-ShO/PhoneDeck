@@ -12,6 +12,26 @@ public partial class HomePage : Page
     {
         InitializeComponent();
         DataContext = _service;
+
+        // The receiver reports from its own threads; the page may be shown and left many times.
+        Loaded += (_, _) =>
+        {
+            CastService.Instance.StatusChanged += OnCastStatusChanged;
+            ShowCastStatus();
+        };
+        Unloaded += (_, _) => CastService.Instance.StatusChanged -= OnCastStatusChanged;
+    }
+
+    private void OnCastStatusChanged() => Dispatcher.BeginInvoke(ShowCastStatus);
+
+    private void ShowCastStatus()
+    {
+        var status = CastService.Instance.Status;
+        CastStatusText.Text = status.Describe();
+        // TryFindResource: a missing theme key must not crash the page.
+        if (TryFindResource(status.IsProblem ? "SystemFillColorCriticalBrush" : "TextFillColorSecondaryBrush")
+            is System.Windows.Media.Brush brush)
+            CastStatusText.Foreground = brush;
     }
 
     private void OnTargetChecked(object sender, RoutedEventArgs e)

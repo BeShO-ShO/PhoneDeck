@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using PhoneDeck.Core;
 
 namespace PhoneDeck.App.Services;
 
@@ -71,14 +73,113 @@ public sealed class AppSettings : INotifyPropertyChanged
     private bool _useWirelessDisplay;
 
     /// <summary>
-    /// How the phone's screen is shown: false for a capture device in mpv, true for Windows'
-    /// Wireless Display app. With the wireless display, touch is native and PhoneDeck sends the
-    /// keyboard, mouse and pen. Applies the next time capture starts.
+    /// The setting from before PhoneDeck had its own receiver: true meant Windows' Wireless
+    /// Display app. Only read to choose <see cref="DisplayRoute"/> for settings saved back then.
     /// </summary>
     public bool UseWirelessDisplay
     {
         get => _useWirelessDisplay;
         set { if (Set(ref _useWirelessDisplay, value)) Save(); }
+    }
+
+    private int? _savedDisplayRoute;
+
+    /// <summary>The saved <see cref="DisplayRoute"/>; null in settings saved before it existed.</summary>
+    public int? SavedDisplayRoute
+    {
+        get => _savedDisplayRoute;
+        set { if (Set(ref _savedDisplayRoute, value)) Save(); }
+    }
+
+    /// <summary>
+    /// How the phone's screen is shown: a capture device, PhoneDeck's own cast receiver, or
+    /// Windows' Wireless Display app. Applies the next time capture starts; the receiver starts
+    /// or stops at once.
+    /// </summary>
+    [JsonIgnore]
+    public DisplayRoute DisplayRoute
+    {
+        get => DisplayRoutes.FromSaved(_savedDisplayRoute, _useWirelessDisplay);
+        set
+        {
+            if (value == DisplayRoute && _savedDisplayRoute is not null) return;
+            SavedDisplayRoute = (int)value;
+            OnPropertyChanged(nameof(DisplayRoute));
+            OnPropertyChanged(nameof(RouteIsCaptureDevice));
+            OnPropertyChanged(nameof(RouteIsWireless));
+            OnPropertyChanged(nameof(RouteIsCast));
+            OnPropertyChanged(nameof(RouteIsWirelessDisplayApp));
+        }
+    }
+
+    private bool? _savedWirelessUsesApp;
+
+    /// <summary>The receiver chosen in Settings; null in settings saved before it existed.</summary>
+    public bool? SavedWirelessUsesApp
+    {
+        get => _savedWirelessUsesApp;
+        set { if (Set(ref _savedWirelessUsesApp, value)) Save(); }
+    }
+
+    /// <summary>
+    /// Which receiver Wireless on Home uses: PhoneDeck's own, or Windows' Wireless Display app as
+    /// the backup. Kept while the capture device is chosen, so switching back to Wireless uses it.
+    /// </summary>
+    [JsonIgnore]
+    public bool WirelessUsesApp
+    {
+        get => DisplayRoutes.UsesApp(_savedWirelessUsesApp, DisplayRoute);
+        set
+        {
+            SavedWirelessUsesApp = value;
+            OnPropertyChanged(nameof(WirelessUsesApp));
+            OnPropertyChanged(nameof(WirelessIsPhoneDeck));
+            OnPropertyChanged(nameof(WirelessIsApp));
+            if (DisplayRoutes.IsWireless(DisplayRoute)) DisplayRoute = DisplayRoutes.Wireless(value);
+        }
+    }
+
+    // One per radio button, so XAML can bind each without a converter.
+    [JsonIgnore]
+    public bool WirelessIsPhoneDeck
+    {
+        get => !WirelessUsesApp;
+        set { if (value) WirelessUsesApp = false; }
+    }
+
+    [JsonIgnore]
+    public bool WirelessIsApp
+    {
+        get => WirelessUsesApp;
+        set { if (value) WirelessUsesApp = true; }
+    }
+
+    [JsonIgnore]
+    public bool RouteIsCaptureDevice
+    {
+        get => DisplayRoute == DisplayRoute.CaptureDevice;
+        set { if (value) DisplayRoute = DisplayRoute.CaptureDevice; }
+    }
+
+    [JsonIgnore]
+    public bool RouteIsWireless
+    {
+        get => DisplayRoutes.IsWireless(DisplayRoute);
+        set { if (value) DisplayRoute = DisplayRoutes.Wireless(WirelessUsesApp); }
+    }
+
+    [JsonIgnore]
+    public bool RouteIsCast
+    {
+        get => DisplayRoute == DisplayRoute.Cast;
+        set { if (value) DisplayRoute = DisplayRoute.Cast; }
+    }
+
+    [JsonIgnore]
+    public bool RouteIsWirelessDisplayApp
+    {
+        get => DisplayRoute == DisplayRoute.WirelessDisplayApp;
+        set { if (value) DisplayRoute = DisplayRoute.WirelessDisplayApp; }
     }
 
     private bool _openViewerWithCapture = true;
@@ -222,6 +323,8 @@ public sealed class AppSettings : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    private void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

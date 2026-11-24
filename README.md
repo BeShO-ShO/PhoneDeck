@@ -12,8 +12,9 @@ It works in either of two ways of showing the phone's screen:
 - **Capture device:** the phone's USB-C video output goes into a **USB video capture device**,
   shown in PhoneDeck's own low-delay viewer. It also shows **work apps that block wireless
   casting**, since a wired display looks like any monitor to the phone.
-- **Wireless:** the phone casts DeX to Windows' **Wireless Display** app over Wi-Fi. No extra
-  hardware is needed, but there is more delay.
+- **Wireless:** the phone casts DeX to the PC over Wi-Fi, and PhoneDeck receives the cast itself
+  and shows it in its own window at up to 60 fps. No extra hardware is needed, but there is more
+  delay. Windows' **Wireless Display** app is kept as a backup.
 
 Either way, the keyboard, mouse, touch and pen all work, with a button bar for Android's
 navigation buttons.
@@ -26,7 +27,7 @@ PhoneDeck's Bluetooth layer is **[windows-ble-hid](https://github.com/abhishek-r
 by Abhishek Raj** (MIT License). His code presents the PC to the phone as a Bluetooth LE
 keyboard and mouse (HID over GATT), and also provides the input capture, multi-host switching,
 lock-key tracking, and the CLI and background mode. PhoneDeck builds the rest around it: the
-capture viewer, Wireless Display support, touch and pen, the navigation bar, and the app
+capture viewer, the cast receiver, touch and pen, the navigation bar, and the app
 itself. See [What PhoneDeck adds](#what-phonedeck-adds).
 
 His project's history is kept in this repository, so his commits stay credited to him. His
@@ -39,8 +40,9 @@ notes are in [DEVELOPMENT.md](DEVELOPMENT.md).
 - A Bluetooth radio that supports the **LE peripheral role** (Details → Logs shows
   `Peripheral=True`).
 - An Android phone that accepts Bluetooth keyboards, mice and touchscreens.
-- To show the phone's screen: a USB video capture device and a phone with video output, or
-  Windows' **Wireless Display** app (an optional Windows feature) and a phone that can cast DeX.
+- To show the phone's screen: a USB video capture device and a phone with video output, or a
+  phone that can cast DeX and a PC whose Wi-Fi can receive a cast (Windows' **Wireless Display**
+  optional feature installed).
 
 Tested on a Surface Pro with a Snapdragon X processor (ARM64) and a Surface Go 3 (x64), with a
 Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
@@ -53,8 +55,8 @@ Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
 2. Pair the phone with the PC from the phone's Bluetooth settings. In the PC's Bluetooth details
    on the phone, leave only **Input device** on: Media audio and Phone calls compete for the
    radio and add mouse lag.
-3. On Home, choose how to show the phone's screen. For a capture device, pick it in Settings →
-   Phone's screen.
+3. On Home, choose **Capture device** or **Wireless** to show the phone's screen. For a capture
+   device, pick it in Settings → Phone's screen.
 4. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then press
    **Ctrl+Alt+Q** (or **Start capture**). Press it again to return input to the PC.
 
@@ -85,10 +87,23 @@ Phone's screen. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer reco
 low-delay options and follows its window for touch. To start mpv yourself, see
 [docs/MPV.md](docs/MPV.md).
 
-### Wireless Display
+### Wireless
 
-Choose **Wireless Display** on Home. Starting capture opens the app if it isn't open; then cast
-DeX to the PC from the phone.
+Choose **Wireless** on Home. While it is chosen, PhoneDeck listens for a cast, and Home shows
+whether it is ready. Cast DeX to the PC from the phone; starting capture shows it full screen.
+
+- The first cast makes Windows ask to let PhoneDeck through the **firewall**. Allow it on private
+  networks, or the phone can't reach it.
+- The keyboard, mouse, touch, pen and the bar work as with a capture device, and the **sound**
+  switch on Home plays or mutes the cast.
+- PhoneDeck only reads Windows' "Projecting to this PC" settings and never changes them. Close
+  the Wireless Display app while using it, or the phone may cast there instead.
+
+### Wireless Display app (backup)
+
+If PhoneDeck can't receive the cast on your PC, choose **Wireless Display app** in Settings →
+Receive Wireless with. Starting capture then opens the app if it isn't open; cast DeX to the PC
+from the phone.
 
 - **Touch** works through the cast itself. PhoneDeck adds the keyboard, mouse and pen.
 - **Don't minimise** Wireless Display, use **Win+D**, or switch away from its own full screen
@@ -112,7 +127,7 @@ On top of windows-ble-hid v0.6.0:
   PC's touchscreen and mapped onto the picture.
 - **Pen input**: hover, pressure, the barrel button and the eraser.
 - **Two ways to show the phone**: a built-in low-delay capture viewer (with mpv as a backup), or
-  Windows' Wireless Display.
+  its own wireless cast receiver (with Windows' Wireless Display app as a backup).
 - **Navigation bar** for Android: Split screen, Recents, Home and Back.
 - **Ctrl+Alt+Q** toggles capture on and off, and always turns on to the phone.
 - **Lower pointer delay**: the fastest Bluetooth link the phone allows (Windows 11), and pointer
@@ -143,11 +158,14 @@ zips to a GitHub release.
   without re-pairing.
 - **No picture in the built-in viewer**: check the device in Settings → Phone's screen, and close
   any other app using it (Details → Logs says why). If it still fails, switch to mpv.
+- **The phone can't find the PC to cast to, or the cast fails**: check that Home says it is
+  ready, that the Wireless Display app is closed, and that PhoneDeck is allowed through the
+  firewall. If it still fails, use the Wireless Display app (Settings → Receive Wireless with).
 
 ## Known limitations
 
 - Touch and pen work only on the main display, where the PC's touchscreen is.
-- With Wireless Display, the Windows pointer can stay visible over the picture until the screen
+- With the Wireless Display app, the Windows pointer can stay visible over the picture until the screen
   is touched.
 - After PhoneDeck restarts, the phone usually needs a **Connect** tap to reconnect.
 - Builds are unsigned, so Windows SmartScreen may warn on first run.

@@ -37,7 +37,11 @@ internal sealed class CaptureViewer : IDisposable
     private readonly Action<string> _log;
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _created = new();
-    private readonly VideoPipeline? _video;
+    private VideoPipeline? _video;
+    // The cast's picture instead of _video; made and used on the window thread.
+    private readonly bool _castMode;
+    private CastPicture? _cast;
+    private bool _windowFailed;
     private SoundPassthrough? _sound;
     private readonly object _soundGate = new();
     private bool _disposed;
@@ -57,19 +61,9 @@ internal sealed class CaptureViewer : IDisposable
     private bool _idleHidden;
 
     /// <param name="audioDevice">The capture device's sound input, or null for no sound.</param>
-    public CaptureViewer(string videoDevice, string? audioDevice, Action<string> log)
+    public CaptureViewer(string videoDevice, string? audioDevice, Action<string> log) : this(log, cast: false)
     {
-        _log = log;
-        _thread = new Thread(RunWindow) { IsBackground = true, Name = "PhoneDeck viewer window" };
-        _thread.SetApartmentState(ApartmentState.STA);
-        _thread.Start();
-
-        if (!_created.Wait(TimeSpan.FromSeconds(5)) || _window == IntPtr.Zero)
-        {
-            _closed = true;
-            _log("viewer: the window could not be created");
-            return;
-        }
+        if (_windowFailed) return;
 
         _video = new VideoPipeline(videoDevice, _window, () => (_clientWidth, _clientHeight), OnVideoSize, _log);
 
@@ -87,6 +81,38 @@ internal sealed class CaptureViewer : IDisposable
                 }
             });
         }
+    }
+
+    private CaptureViewer(Action<string> log, bool cast)
+    {
+        _log = log;
+        _castMode = cast;
+        _thread = new Thread(RunWindow) { IsBackground = true, Name = "PhoneDeck viewer window" };
+        _thread.SetApartmentState(ApartmentState.STA);
+        _thread.Start();
+
+        if (!_created.Wait(TimeSpan.FromSeconds(5)) || _window == IntPtr.Zero)
+        {
+            _closed = true;
+            _windowFailed = true;
+            _log("viewer: the window could not be created");
+        }
+    }
+
+    /// <summary>
+    /// The same window for PhoneDeck's own cast receiver: black until <see cref="ShowCast"/>
+    /// gives it the cast's player. Sound comes from the player itself.
+    /// </summary>
+    public static CaptureViewer ForCast(Action<string> log) => new(log, cast: true);
+
+    /// <summary>Shows the cast's player, or black for null (waiting for the phone).</summary>
+    public void ShowCast(global::Windows.Media.Playback.MediaPlayer? player) => _cast?.Show(player);
+
+    /// <summary>The picture's size, for letterboxing and for where touch lands.</summary>
+    public void SetVideoSize(int width, int height)
+    {
+        OnVideoSize(width, height);
+        if (width > 0 && height > 0) _cast?.SetAspect((double)width / height);
     }
 
     /// <summary>False once the window has been closed, by the user or by <see cref="Dispose"/>.</summary>
@@ -127,6 +153,8 @@ internal sealed class CaptureViewer : IDisposable
         {
             var instance = GetModuleHandle(null);
             Register(instance);
+            // Composition needs a dispatcher queue on this thread before anything is made.
+            if (_castMode) CastPicture.EnsureDispatcherQueue();
 
             var primary = MonitorInfo(MonitorFromPoint(new POINT(), MONITOR_DEFAULTTOPRIMARY));
             var screen = primary.rcMonitor;
@@ -145,6 +173,8 @@ internal sealed class CaptureViewer : IDisposable
 
             _window = window;
             _fullScreen = true;
+            if (_castMode && GetClientRect(window, out var client))
+                _cast = new CastPicture(window, client.Width, client.Height, _log);
             SetTimer(window, IdleTimer, 250, IntPtr.Zero);
             SetForegroundWindow(window);
             UpdateRegion();
@@ -256,6 +286,7 @@ internal sealed class CaptureViewer : IDisposable
             case WM_SIZE:
                 _clientWidth = LowWord(lParam);
                 _clientHeight = HighWord(lParam);
+                _cast?.Resize(_clientWidth, _clientHeight);
                 UpdateRegion();
                 break;
 
@@ -302,6 +333,9 @@ internal sealed class CaptureViewer : IDisposable
                 Windows.TryRemove(window, out _);
                 _closed = true;
                 VideoRegion.Current = null;
+                // Composition objects belong to this thread.
+                _cast?.Dispose();
+                _cast = null;
                 // Closed by the user: let go of the capture device and the sound now.
                 _ = Task.Run(StopMedia);
                 PostQuitMessage(0);

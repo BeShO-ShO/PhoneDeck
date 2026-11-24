@@ -100,15 +100,28 @@
 
     <!-- How the phone's screen is shown, and below it only the options that apply to that way. -->
     <ui:TextBlock Text="Show the phone's screen with" FontTypography="BodyStrong" Margin="0,4,0,8" />
-    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-      <RadioButton GroupName="HomeDisplayRoute" Content="Capture device" Margin="0,0,24,0"
-                   IsChecked="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
-      <RadioButton GroupName="HomeDisplayRoute" Content="Wireless Display"
-                   IsChecked="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
-    </StackPanel>
+    <WrapPanel Margin="0,0,0,8">
+      <RadioButton GroupName="HomeDisplayRoute" Content="Capture device" Margin="0,0,24,4"
+                   IsChecked="{Binding RouteIsCaptureDevice, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      <RadioButton GroupName="HomeDisplayRoute" Content="Wireless" Margin="0,0,0,4"
+                   IsChecked="{Binding RouteIsWireless, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+    </WrapPanel>
 
-    <StackPanel Visibility="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource InverseBoolToVisibility}}">
-      <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
+    <!-- PhoneDeck's own receiver: its state, so "is it ready?" needs no guessing. -->
+    <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,8"
+                    Visibility="{Binding RouteIsCast, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Cast DeX to this PC" FontTypography="BodyStrong" />
+          <ui:TextBlock x:Name="CastStatusText" FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+      </ui:CardControl.Header>
+    </ui:CardControl>
+
+    <StackPanel Visibility="{Binding RouteIsWirelessDisplayApp, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource InverseBoolToVisibility}}">
+      <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8"
+                      Visibility="{Binding RouteIsCaptureDevice, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
         <ui:CardControl.Header>
           <StackPanel>
             <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
@@ -126,7 +139,7 @@
             <ui:TextBlock Text="Play the phone's sound" FontTypography="BodyStrong" />
             <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="From the capture device. Off can mean less delay. Applies when the screen next opens." />
+                          Text="From the capture device or the cast. Off can mean less delay with a capture device." />
           </StackPanel>
         </ui:CardControl.Header>
         <ui:ToggleSwitch IsChecked="{Binding ViewerSound, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
@@ -146,10 +159,10 @@
     </StackPanel>
 
     <ui:CardControl Icon="{ui:SymbolIcon Cast24}"
-                    Visibility="{Binding UseWirelessDisplay, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
+                    Visibility="{Binding RouteIsWirelessDisplayApp, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
       <ui:CardControl.Header>
         <StackPanel>
-          <ui:TextBlock Text="Cast DeX to this PC" FontTypography="BodyStrong" />
+          <ui:TextBlock Text="Cast DeX to the Wireless Display app" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                         Text="Touch works through the cast; PhoneDeck adds the keyboard, mouse and pen. Don't minimise Wireless Display: use the bar's buttons to fill the screen or send it back." />

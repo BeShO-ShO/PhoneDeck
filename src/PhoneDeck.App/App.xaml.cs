@@ -68,6 +68,19 @@ public partial class App : Application
             Dispatcher.Invoke(() => Tray?.UpdateStatus(peripheral.Target, peripheral.TargetLockWarning));
         };
 
+        // PhoneDeck's own cast receiver listens while the Wireless route is chosen. Changing the
+        // route closes whichever viewer was open, so the next capture opens the right one.
+        CastService.Instance.Apply(peripheral.LogApp);
+        AppSettings.Instance.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName != nameof(AppSettings.DisplayRoute) || _exiting) return;
+            Dispatcher.InvokeAsync(() =>
+            {
+                ViewerService.Instance.Stop();
+                CastService.Instance.Apply(peripheral.LogApp);
+            });
+        };
+
         var startHidden = e.Args.Contains(StartupService.TrayArgument, StringComparer.OrdinalIgnoreCase);
         MainWindow = new MainWindow();
         if (!startHidden) MainWindow.Show();
@@ -143,7 +156,7 @@ public partial class App : Application
 
             // In wireless mode the bar is the only way to reach fill screen and send to back, and
             // the pen, so it shows whatever the touch switch says.
-            _redirectWireless = AppSettings.Instance.UseWirelessDisplay;
+            _redirectWireless = AppSettings.Instance.DisplayRoute == DisplayRoute.WirelessDisplayApp;
             if (_redirectWireless)
             {
                 // Opened if needed but never closed by PhoneDeck: closing it ends the cast.
@@ -209,6 +222,8 @@ public partial class App : Application
         catch (Exception ex) { Report(ex); }
         Tray?.Dispose();
         _captureHotkey?.Dispose();
+        try { CastService.Instance.Stop(); }
+        catch (Exception ex) { Report(ex); }
         ViewerService.Instance.Stop();
         // A filled window would otherwise be remembered with its title bar off screen.
         try { WirelessDisplay.RestoreIfFilled(); }
