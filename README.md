@@ -135,7 +135,7 @@ The PC's touchscreen and pen don't line up with a picture on another monitor, so
 ## Tips
 
 - For the easiest pointer, turn on **Enhance pointer precision** in the phone's mouse settings
-  (Android, next to pointer speed; not the Windows setting).
+  (Android, next to pointer speed).
 - On slower PCs, Windows' **Best performance** power mode makes a clear difference to delay.
 - A capture adapter with a USB-C power input keeps the phone charged; DeX and Bluetooth drain it
   quickly.
