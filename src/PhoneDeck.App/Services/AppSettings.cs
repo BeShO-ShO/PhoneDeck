@@ -90,6 +90,68 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _openViewerWithCapture, value)) Save(); }
     }
 
+    private bool _useBuiltInViewer = true;
+
+    /// <summary>
+    /// Shows the capture device in PhoneDeck's own window (true) or in mpv (false). Both stay
+    /// available. Applies the next time the viewer opens.
+    /// </summary>
+    public bool UseBuiltInViewer
+    {
+        get => _useBuiltInViewer;
+        set { if (Set(ref _useBuiltInViewer, value)) Save(); }
+    }
+
+    private bool _viewerSound = true;
+
+    /// <summary>
+    /// Plays the capture device's sound (from <see cref="ViewerAudioDevice"/>). Off can mean
+    /// less delay, in mpv above all. Applies the next time the viewer opens.
+    /// </summary>
+    public bool ViewerSound
+    {
+        get => _viewerSound;
+        set { if (Set(ref _viewerSound, value)) Save(); }
+    }
+
+    private int _viewerRange;
+
+    /// <summary>
+    /// The built-in viewer's black and white levels: 0 as detected, 1 full (0 to 255), 2 limited
+    /// (16 to 235). As an index, so a combo box can bind to it. Applies at once.
+    /// </summary>
+    public int ViewerRange
+    {
+        get => _viewerRange;
+        set { if (Set(ref _viewerRange, Math.Clamp(value, 0, 2))) Save(); }
+    }
+
+    private int _viewerBrightness;
+    private int _viewerContrast;
+    private int _viewerSaturation;
+
+    /// <summary>Built-in viewer picture levels, -50 to 50, 0 unchanged. Apply at once.</summary>
+    public int ViewerBrightness
+    {
+        get => _viewerBrightness;
+        set { if (Set(ref _viewerBrightness, ClampLevel(value))) Save(); }
+    }
+
+    public int ViewerContrast
+    {
+        get => _viewerContrast;
+        set { if (Set(ref _viewerContrast, ClampLevel(value))) Save(); }
+    }
+
+    public int ViewerSaturation
+    {
+        get => _viewerSaturation;
+        set { if (Set(ref _viewerSaturation, ClampLevel(value))) Save(); }
+    }
+
+    private static int ClampLevel(int value) =>
+        Math.Clamp(value, PhoneDeck.Core.PictureLevels.Min, PhoneDeck.Core.PictureLevels.Max);
+
     private string? _viewerVideoDevice;
 
     /// <summary>

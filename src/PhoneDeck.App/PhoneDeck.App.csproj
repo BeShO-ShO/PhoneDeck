@@ -18,6 +18,8 @@
     <!-- WFAC010 asks for the WinForms DPI property instead, but the manifest has to declare it:
          the capture hook reports physical pixels and must not be virtualised. -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- The built-in viewer copies frame rows between native buffers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!-- Only valid when bundling, so a plain build or dotnet run is unaffected. -->
@@ -43,6 +45,13 @@
 
   <ItemGroup>
     <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <!-- The built-in capture viewer: Media Foundation and Direct3D (Vortice, MIT) and the
+         capture device's sound (NAudio, MIT). -->
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.8.3" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.4.0" />
   </ItemGroup>
 
 </Project>

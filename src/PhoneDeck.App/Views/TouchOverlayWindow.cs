@@ -145,9 +145,12 @@ public sealed class TouchOverlayWindow : Window
 
         Loaded += (_, _) => PlaceBar();
         VideoRegion.Changed += OnVideoMoved;
+        // PhoneDeck's own viewer keeps VideoRegion up to date itself, and must not have it reset.
         _locator = wireless
             ? new WirelessDisplayLocator(message => log($"viewer: {message}"))
-            : new MpvVideoLocator(viewerProcessId, message => log($"viewer: {message}"));
+            : ViewerService.Instance.IsBuiltInOpen
+                ? new NoLocator()
+                : new MpvVideoLocator(viewerProcessId, message => log($"viewer: {message}"));
         _reader = new RawTouchReader(OnFrame, OnPen, log);
 
         _keepAlive = new DispatcherTimer(TimeSpan.FromMilliseconds(KeepAliveMs / 2), DispatcherPriority.Input,
@@ -171,8 +174,13 @@ public sealed class TouchOverlayWindow : Window
             return;
         }
 
-        if (!await MpvVideoLocator.SendCommandAsync("cycle", "fullscreen"))
-            _log("viewer: full screen needs the mpv PhoneDeck starts (or --input-ipc-server); nothing changed");
+        if (!await ViewerService.Instance.ToggleFullScreenAsync())
+            _log("viewer: full screen needs PhoneDeck's viewer or the mpv it starts (or --input-ipc-server); nothing changed");
+    }
+
+    private sealed class NoLocator : IDisposable
+    {
+        public void Dispose() { }
     }
 
     /// <summary>

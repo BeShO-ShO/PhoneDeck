@@ -8,6 +8,15 @@
 
   <Page.Resources>
     <conv:InverseBoolConverter x:Key="InverseBool" />
+    <conv:BoolToVisibilityConverter x:Key="InverseBoolToVisibility" Invert="True" />
+    <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    <Style x:Key="PictureSlider" TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
+      <Setter Property="Minimum" Value="-50" />
+      <Setter Property="Maximum" Value="50" />
+      <Setter Property="TickFrequency" Value="5" />
+      <Setter Property="IsSnapToTickEnabled" Value="True" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
   </Page.Resources>
 
   <StackPanel Margin="16,4,16,16">
@@ -101,7 +110,7 @@
         </StackPanel>
       </ui:CardControl.Header>
       <StackPanel>
-        <RadioButton GroupName="SettingsDisplayRoute" Content="Capture device (mpv)" Margin="0,0,0,4"
+        <RadioButton GroupName="SettingsDisplayRoute" Content="Capture device" Margin="0,0,0,4"
                      IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
         <RadioButton GroupName="SettingsDisplayRoute" Content="Wireless Display"
                      IsChecked="{Binding UseWirelessDisplay, Mode=TwoWay}" />
@@ -122,22 +131,55 @@
 
     <ui:Card Margin="0,0,0,8" Padding="16,12,16,16">
       <StackPanel>
-        <ui:TextBlock Text="Phone's screen (mpv)" FontTypography="BodyStrong" />
+        <ui:TextBlock Text="Phone's screen (capture device)" FontTypography="BodyStrong" />
         <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,2,0,12"
                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                      Text="Opened with capture when the switch on Home is on." />
+                      Text="Opened with capture when the switch on Home is on. Changes apply the next time it opens." />
+
+        <ui:TextBlock Text="Show it in" FontTypography="Caption" Margin="0,0,0,4" />
+        <RadioButton GroupName="SettingsViewer" Content="PhoneDeck's viewer (built in, no mpv needed)" Margin="0,0,0,4"
+                     IsChecked="{Binding UseBuiltInViewer, Mode=TwoWay}" />
+        <RadioButton GroupName="SettingsViewer" Content="mpv" Margin="0,0,0,10"
+                     IsChecked="{Binding UseBuiltInViewer, Mode=TwoWay, Converter={StaticResource InverseBool}}" />
 
         <ui:TextBlock Text="Video" FontTypography="Caption" Margin="0,0,0,4" />
         <ComboBox x:Name="VideoDeviceBox" IsEditable="True" Margin="0,0,0,10"
                   Text="{Binding ViewerVideoDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-        <ui:TextBlock Text="Sound (empty for none, least delay)" FontTypography="Caption" Margin="0,0,0,4" />
-        <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,10"
+        <ui:TextBlock Text="Sound device" FontTypography="Caption" Margin="0,0,0,4" />
+        <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,6"
                   Text="{Binding ViewerAudioDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+        <CheckBox Content="Play the sound (off can mean less delay)" Margin="0,0,0,10"
+                  IsChecked="{Binding ViewerSound, Mode=TwoWay}" />
 
-        <ui:TextBlock Text="mpv.exe" FontTypography="Caption" Margin="0,0,0,4" />
-        <ui:TextBox x:Name="MpvPathBox" Margin="0,0,0,10"
-                    Text="{Binding MpvPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+        <StackPanel Visibility="{Binding UseBuiltInViewer, Converter={StaticResource InverseBoolToVisibility}}">
+          <ui:TextBlock Text="mpv.exe" FontTypography="Caption" Margin="0,0,0,4" />
+          <ui:TextBox x:Name="MpvPathBox" Margin="0,0,0,10"
+                      Text="{Binding MpvPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding UseBuiltInViewer, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,10">
+          <ui:TextBlock Text="Picture" FontTypography="BodyStrong" Margin="0,4,0,2" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,8"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="Shows at once in an open viewer, with no added delay: the graphics card does it in the same step that scales the picture. Too bright with grey blacks? Try Limited first." />
+
+          <ui:TextBlock Text="Black and white levels" FontTypography="Caption" Margin="0,0,0,4" />
+          <ComboBox SelectedIndex="{Binding ViewerRange, Mode=TwoWay}" Margin="0,0,0,10">
+            <ComboBoxItem Content="Automatic" />
+            <ComboBoxItem Content="Full (0 to 255)" />
+            <ComboBoxItem Content="Limited (16 to 235)" />
+          </ComboBox>
+
+          <ui:TextBlock Text="{Binding ViewerBrightness, StringFormat='Brightness: {0}'}" FontTypography="Caption" />
+          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerBrightness, Mode=TwoWay}" />
+          <ui:TextBlock Text="{Binding ViewerContrast, StringFormat='Contrast: {0}'}" FontTypography="Caption" />
+          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerContrast, Mode=TwoWay}" />
+          <ui:TextBlock Text="{Binding ViewerSaturation, StringFormat='Colour: {0}'}" FontTypography="Caption" />
+          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerSaturation, Mode=TwoWay}" />
+
+          <ui:Button Content="Reset picture" Click="OnResetPicture" Margin="0,4,0,0" />
+        </StackPanel>
 
         <StackPanel Orientation="Horizontal">
           <ui:Button Content="Open now" Click="OnOpenViewer" />

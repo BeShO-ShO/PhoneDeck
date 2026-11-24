@@ -7,17 +7,16 @@ mouse, touchscreen and pen for an Android phone running a desktop mode such as S
 The PC's input reaches the phone over Bluetooth, as a real keyboard and mouse would, so
 nothing needs installing on the phone and developer options stay off.
 
-It is fully functional in either of two ways of showing the phone's screen:
+It works in either of two ways of showing the phone's screen:
 
-- **Wireless:** the phone casts DeX to Windows' **Wireless Display** app over Wi-Fi. No extra
-  hardware is needed.
 - **Capture device:** the phone's USB-C video output goes into a **USB video capture device**,
-  shown on the PC in mpv. It has less delay, and it also shows **work apps that block wireless
-  casting**: apps in a managed work profile often refuse to appear on a cast screen, but a
-  wired display shows them like any monitor.
+  shown in PhoneDeck's own low-delay viewer. It also shows **work apps that block wireless
+  casting**, since a wired display looks like any monitor to the phone.
+- **Wireless:** the phone casts DeX to Windows' **Wireless Display** app over Wi-Fi. No extra
+  hardware is needed, but there is more delay.
 
-Switch between them on PhoneDeck's Home page. Either way, the keyboard, mouse, touch and pen
-all work, with a button bar for Android's navigation buttons.
+Either way, the keyboard, mouse, touch and pen all work, with a button bar for Android's
+navigation buttons.
 
 ![Samsung DeX shown on a Windows PC through the Wireless Display app](docs/screenshots/dex-wireless-display.png)
 
@@ -36,203 +35,96 @@ His original README, with the detailed technical background, is kept as
 [docs/ORIGINAL-README.md](docs/ORIGINAL-README.md), and his developer notes are in
 [DEVELOPMENT.md](DEVELOPMENT.md). Paths in both were updated for the rename.
 
-PhoneDeck adds the DeX workflow on top: the capture-device and wireless display routes, touch
+PhoneDeck adds the DeX workflow on top: the built-in viewer and wireless display routes, touch
 and pen, and the button bar. See [What PhoneDeck adds](#what-phonedeck-adds).
-
-## How the setup fits together
-
-```
- Android phone ── USB-C video out ──► capture device ── USB ──► Windows PC
-      ▲                                                        │
-      │                                              mpv shows the phone's screen
-      │                                                        │
-      └──────────── Bluetooth LE: keyboard, mouse, touch ◄── PhoneDeck
-```
-
-- The **capture device** turns the phone's video output into something Windows sees as a
-  webcam. mpv shows it full screen.
-- **PhoneDeck** presents the PC to the phone as a Bluetooth keyboard, mouse and touchscreen.
-  While capture is on, the PC's keyboard and mouse go to the phone, and touches on the video
-  land on the same spot on the phone's screen.
-
-### Capture device
-
-Any USB capture device that Windows recognises as a camera should work. For reference only —
-**this is an example, not a recommendation** — the setup PhoneDeck was developed on uses a
-Benfei USB-C to USB-C capture adapter. It delivers uncompressed 1080p at 60 frames per second
-over USB 3, and has a USB-C power input that passes charge through to the phone, which helps
-because desktop mode plus Bluetooth drains the battery quickly. The device names in the mpv
-commands below (`USB3 Video`, `Digital Audio Interface (USB3 Digital Audio)`) are what that
-adapter reports; yours will differ.
-
-To find your device's names, run:
-
-```
-mpv av://dshow:list_devices=true
-```
-
-### Video player: mpv
-
-[mpv](https://mpv.io/) is used to show the capture device. On the development setup, **mpv 0.42
-or newer** was markedly faster than 0.40, to the point of removing a noticeable picture delay.
-
-Without sound (lowest delay):
-
-```
-mpv av://dshow:video="USB3 Video" --cache=no --osc=no
-```
-
-With sound from the capture device (adds a little delay):
-
-```
-mpv av://dshow:video="USB3 Video":audio="Digital Audio Interface (USB3 Digital Audio)" --cache=no --osc=no --demuxer-lavf-o=audio_buffer_size=50
-```
-
-- `--cache=no` stops mpv building up a buffer.
-- `--osc=no` hides mpv's on-screen controls, which touches would otherwise bring up.
-- `--demuxer-lavf-o=audio_buffer_size=50` shrinks the capture audio buffer from its default of
-  about half a second, which otherwise delays the picture too.
-- Press `f` for full screen. Touch follows the mpv window, so a windowed or differently shaped
-  picture works too, as long as it is on the main display (the one with the touchscreen).
-
-**PhoneDeck can start mpv for you.** In Settings, under *Phone's screen (mpv)*, pick the
-capture device (and its sound, if you want it), and turn on *Open the phone's screen* on Home.
-Starting capture then opens mpv full screen with the options above, unless mpv is already open. mpv stays open when capture stops and
-closes when PhoneDeck exits. PhoneDeck finds `mpv.exe` on PATH or in Program Files (preferring a
-native ARM64 build on ARM64), or you can enter its location.
-
-PhoneDeck also starts mpv with `--input-ipc-server=\\.\pipe\phonedeck-mpv`, which lets it ask mpv
-exactly where the picture is. If you start mpv yourself, add that option to your shortcut for the
-same precision; without it PhoneDeck assumes a 16:9 picture inside the mpv window.
-
-Windows also delivers your touches to mpv, which by default turns a two-finger move into volume
-changes and a double tap into full screen. The mpv PhoneDeck starts ignores the mouse and wheel
-(its keys, such as `f`, still work), using `%LOCALAPPDATA%\PhoneDeck\mpv-input.conf`. Add
-`--input-conf=` with that file to your own shortcut for the same behaviour. It is also started
-with `--no-window-dragging`, because a pen stroke reaches mpv as a mouse drag and would
-otherwise move a windowed mpv; the title bar still moves it.
-
-For less picture delay, which you notice most with the mouse pointer, PhoneDeck also starts mpv
-with `--swapchain-depth=1 --video-latency-hacks=yes --d3d11-sync-interval=0`. These keep fewer
-frames queued, always show the newest captured frame, and stop waiting for the display's
-refresh (fast motion may show a faint tear). On the development setup they made the pointer
-noticeably easier to steer, together with **Enhance pointer precision** turned on in the
-phone's own mouse settings (Android, not Windows: on a Samsung phone, look under Settings for
-the mouse and trackpad options, next to pointer speed).
-
-While input goes to the phone, mpv hides the Windows pointer over the picture and ignores double
-taps. When capture stops, PhoneDeck tells mpv (over the same pipe) to hide the pointer only after a
-second without movement, and to switch full screen on a double tap or double click again, so mpv
-is usable with the mouse or touch alone.
-
-To switch mpv between full screen and a window while capture is on, tap the **full-screen
-button** on the bar, next to Stop. This needs mpv's control pipe, so it works with the mpv
-PhoneDeck starts or one started with `--input-ipc-server=\\.\pipe\phonedeck-mpv`.
-
-Options that made things **slower** on the development setup, so are best avoided there:
-`--profile=low-latency`, `--untimed`, and `--profile=fast`. Results may differ with other
-hardware.
-
-On a Samsung phone in DeX, sound goes to the capture device when you choose
-**Quick settings → Audio output → Display device** inside DeX. On slower PCs, Windows'
-**Best performance** power mode makes a clear difference to video delay.
-
-When making a Windows shortcut for these commands, make sure nothing follows the last option
-when pasting: a hidden line break at the end stops mpv starting from a shortcut, even though the
-same command works in a terminal.
-
-### Without a capture device: Windows Wireless Display
-
-DeX can also cast to the PC over Wi-Fi, using Windows' **Wireless Display** app (an optional
-Windows feature) as the receiver. In PhoneDeck's Settings, set **Show the phone's screen with**
-to **Wireless Display**. There is more picture delay than with a capture device.
-
-- **Touch** on the cast works on its own, through the cast. PhoneDeck does not send it, whatever
-  the touchscreen switch says, so touches don't arrive twice.
-- **Keyboard, mouse and pen** go through PhoneDeck over Bluetooth, as with mpv. The cast ignores
-  the mouse and pen, and Windows' "press Win+K to allow input" prompt does nothing on the
-  receiving PC.
-- Starting capture opens Wireless Display if it isn't open. PhoneDeck never closes it.
-- The **bar** always shows while capture is on, even with the touchscreen switch off. With a
-  capture device, the bar still follows the touchscreen switch.
-- **Don't minimise Wireless Display**: the cast ends at once. Covering it with other windows is
-  fine. The bar's **send-to-back button** puts it behind your other windows instead.
-- **Don't use its own full screen** (Win+Shift+Enter) if you switch apps: switching away from it
-  ends the cast. The bar's **full-screen button** instead stretches the ordinary window so the
-  picture fills the screen above the taskbar, with the title bar just off screen. Press it again to put the window
-  back. PhoneDeck only moves and resizes the window, the same as dragging it, and puts it back when
-  PhoneDeck exits.
-- **Known issue:** while capture is on, the Windows pointer can stay visible over the picture.
-  Windows hides it after a touch on the screen, until the mouse is used on the PC again.
 
 ## Requirements
 
 - Windows 10 version 2004 or later, on x64 or ARM64.
-- A Bluetooth radio that supports the **LE peripheral role**. Check in PhoneDeck under
-  Details → Logs for `Peripheral=True`.
+- A Bluetooth radio that supports the **LE peripheral role** (Details → Logs shows
+  `Peripheral=True`).
 - An Android phone that accepts Bluetooth keyboards, mice and touchscreens.
-- To show the phone's screen, either Windows' **Wireless Display** app (an optional Windows
-  feature) with a phone that can cast DeX, or a USB video capture device and a phone with
-  video output.
+- To show the phone's screen: a USB video capture device and a phone with video output, or
+  Windows' **Wireless Display** app (an optional Windows feature) and a phone that can cast DeX.
 
-Developed and tested on a Surface Pro with a Snapdragon X processor (ARM64) and a Surface Go 3
-(x64), with a Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX. Other combinations are
-untested.
+Tested on a Surface Pro with a Snapdragon X processor (ARM64) and a Surface Go 3 (x64), with a
+Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
 
-## Using PhoneDeck
+## Getting started
 
-1. Run `PhoneDeck.exe`. It is unsigned, so Windows may warn you the first time
+1. Download the zip for your PC from [Releases](https://github.com/BeShO-ShO/PhoneDeck/releases)
+   and run `PhoneDeck.exe`. It is unsigned, so Windows may warn you the first time
    (More info → Run anyway).
-2. On the phone, pair with the PC from Bluetooth settings. In the PC's Bluetooth details on the
-   phone, leave only **Input device** on; Media audio and Phone calls compete for the radio and
-   add mouse lag.
-3. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then press
+2. Pair the phone with the PC from the phone's Bluetooth settings. In the PC's Bluetooth details
+   on the phone, leave only **Input device** on: Media audio and Phone calls compete for the
+   radio and add mouse lag.
+3. On Home, choose how to show the phone's screen. For a capture device, pick it in Settings →
+   Phone's screen.
+4. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then press
    **Ctrl+Alt+Q** (or **Start capture**). Press it again to return input to the PC.
 
-The window has three views:
+<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: two connected phones, Start capture, where input goes, and how the phone's screen is shown" width="360">
 
-<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: two connected phones, Start capture, where input goes, and the choice between a capture device and Wireless Display" width="360">
+While capture is on, a small bar below the picture has **Split screen, Recents, Home and Back**,
+a full-screen button, and a button that turns capture off.
 
-- **Home** — the phone's connection and link speed, Start capture, where input goes, and how
-  the phone's screen is shown (capture device or Wireless Display), with only the options for
-  the chosen way.
-- **Details** (ⓘ) — the Bluetooth service, pointer pacing, shortcuts and logs.
-- **Settings** (⚙) — startup, closing behaviour, and optional switch keys.
+## Showing the phone's screen
 
-While capture is on (with a capture device, when touch is enabled), a small bar sits just below
-the video with **Split screen, Recents, Home and Back** buttons, a full-screen button, and a
-pause button that turns capture off. With Wireless Display it also has a send-to-back button.
+### Capture device (built-in viewer)
+
+Any USB capture device that Windows sees as a camera should work. Starting capture opens
+PhoneDeck's viewer full screen. It picks the device's best mode, reads it with Windows' own
+low-latency capture, and draws each frame on the graphics card as soon as it arrives.
+
+- **Double-click, F11 or F** switches between full screen and a window; **Esc** leaves full
+  screen. While input goes to the phone, double taps belong to the phone and the bar's
+  full-screen button does it instead.
+- **Sound** from the capture device is a switch on Home. Off can mean slightly less delay. On a
+  Samsung phone, send DeX's sound to the capture device with **Quick settings → Audio output →
+  Display device**.
+- **Picture** settings (black and white levels, brightness, contrast, colour) are in Settings
+  and apply instantly, with no added delay.
+
+**mpv as a backup.** If the built-in viewer doesn't work on your PC, choose **mpv** in Settings →
+Phone's screen. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer recommended) with
+low-delay options and follows its window for touch. To start mpv yourself, see
+[docs/MPV.md](docs/MPV.md).
+
+### Wireless Display
+
+Choose **Wireless Display** on Home. Starting capture opens the app if it isn't open; then cast
+DeX to the PC from the phone.
+
+- **Touch** works through the cast itself. PhoneDeck adds the keyboard, mouse and pen.
+- **Don't minimise** Wireless Display, use **Win+D**, or switch away from its own full screen
+  (Win+Shift+Enter): each of these ends the cast. Covering it with other windows is fine.
+- Use the bar's buttons instead: **full screen** stretches the window over the screen above the
+  taskbar, and **send to back** puts it behind your other windows.
+
+## Tips
+
+- For the easiest pointer, turn on **Enhance pointer precision** in the phone's mouse settings
+  (Android, next to pointer speed; not the Windows setting).
+- On slower PCs, Windows' **Best performance** power mode makes a clear difference to delay.
+- A capture adapter with a USB-C power input keeps the phone charged; DeX and Bluetooth drain it
+  quickly.
 
 ## What PhoneDeck adds
 
 Compared with windows-ble-hid v0.6.0:
 
-- **Touch input**: up to five fingers, so pinch-zoom, two-finger scroll and rotate work on the
-  phone. Read directly from the PC's touchscreen (Raw Input) with nothing drawn over the video,
-  and mapped onto wherever the video is.
-- **Pen input**: a pen on the PC's screen is sent as a stylus, with hover, pressure, the barrel
-  button and the eraser end.
-- **Two ways to show the phone**: a capture device in mpv, which PhoneDeck starts when capture
-  starts, or Windows' Wireless Display with DeX cast over Wi-Fi (native touch, PhoneDeck's
-  keyboard, mouse and pen, and fill-screen and send-to-back buttons that keep the cast alive).
-- **Navigation bar** for Android: Split screen, Recents, Home and Back, sent as keyboard
-  shortcuts because edge gestures can't be performed by an external touchscreen.
-- **Ctrl+Alt+Q toggles** capture on and off, and always turns on to the phone.
-  Ctrl+Alt+CapsLock and Ctrl+D+C target switching are optional and off by default.
-- **Compact window** with Home, Details and Settings, and touch scrolling.
-- **Remembers the last phone** and reselects it when it reconnects.
-- **Sends input only to paired devices**, and shows whether the link is really live.
-- **Reliability**: held keys and buttons are released on stop, Bluetooth requests that arrive
-  after a disconnect no longer crash the app, and a lost touch contact no longer freezes touch.
-- **Lower lag on the PC**: the mouse hook is removed while input stays on the PC.
-- **Lower pointer delay on the phone** (Windows 11): PhoneDeck asks the phone for its fastest
-  Bluetooth link, and keeps its report timer precise while it sits in the tray. Details → Logs
-  shows the link interval the phone settled on.
-- **Even pointer pacing**: movement is spread evenly across reports, so Android's pointer
-  acceleration sees a steady speed instead of bursts and the pointer moves smoothly. Clicks and
-  target changes wait for the movement before them. Switch it off in Details to compare.
-- **Touchpad scrolling**: fractions of a wheel notch add up instead of being dropped.
-- **Smaller download**: compressed single-file builds.
+- **Touch input**: up to five fingers (pinch-zoom, two-finger scroll), read straight from the
+  PC's touchscreen and mapped onto the picture.
+- **Pen input**: hover, pressure, the barrel button and the eraser.
+- **Two ways to show the phone**: a built-in low-delay capture viewer (with mpv as a backup), or
+  Windows' Wireless Display.
+- **Navigation bar** for Android: Split screen, Recents, Home and Back.
+- **Ctrl+Alt+Q** toggles capture on and off, and always turns on to the phone.
+- **Lower pointer delay**: the fastest Bluetooth link the phone allows (Windows 11), and pointer
+  motion spread evenly across reports so Android's acceleration sees a steady speed.
+- **Reliability**: held keys and buttons are released on stop, and the last phone is reselected
+  when it reconnects.
+- **Compact window** with Home, Details and Settings.
 
 ## Building
 
@@ -249,29 +141,28 @@ zips to a GitHub release.
 
 ## Troubleshooting
 
-- **Input stops reaching the phone, but PhoneDeck still shows it connected**: restart the phone.
-  After a fresh pairing, Android sometimes needs this before input works.
+- **Input stops reaching the phone, but PhoneDeck shows it connected**: restart the phone.
 - **The phone pairs only as an audio device**: forget the PC on the phone, remove the phone in
-  Windows' Bluetooth settings, then pair again with PhoneDeck open. Check that **Input device**
-  appears.
-- **After updating from BleHid**: settings move to `%LOCALAPPDATA%\PhoneDeck` automatically on
-  first launch. Re-pairing is not needed.
+  Windows' Bluetooth settings, then pair again with PhoneDeck open.
+- **Pen does nothing** after updating from an older PhoneDeck: pair again as above. Fingers work
+  without re-pairing.
+- **No picture in the built-in viewer**: check the device in Settings → Phone's screen, and close
+  any other app using it (Details → Logs says why). If it still fails, switch to mpv.
 
 ## Known limitations
 
-- Up to five fingers at once.
 - Touch and pen work only on the main display, where the PC's touchscreen is.
-- **Pen needs a fresh pairing**: a phone paired with an older PhoneDeck keeps the old device
-  description and ignores the pen. Forget the PC on the phone, remove the phone in Windows'
-  Bluetooth settings, and pair again. Fingers work without re-pairing.
+- With Wireless Display, the Windows pointer can stay visible over the picture until the screen
+  is touched.
+- After PhoneDeck restarts, the phone usually needs a **Connect** tap to reconnect.
 - Builds are unsigned, so Windows SmartScreen may warn on first run.
-- After PhoneDeck restarts, the phone usually needs a **Connect** tap in its Bluetooth
-  settings to reconnect.
 
 ## License and trademarks
 
 MIT — see [LICENSE](LICENSE). Copyright Abhishek Raj (original work) and BeShO-ShO
-(PhoneDeck modifications).
+(PhoneDeck modifications). The built-in viewer uses
+[Vortice.Windows](https://github.com/amerkoleci/Vortice.Windows) and
+[NAudio](https://github.com/naudio/NAudio), both MIT.
 
 Samsung DeX, Android, Bluetooth, Windows and Surface are trademarks of their respective owners.
-PhoneDeck is not affiliated with or endorsed by any of them, or by the capture device's maker.
+PhoneDeck is not affiliated with or endorsed by any of them, or by any capture device's maker.

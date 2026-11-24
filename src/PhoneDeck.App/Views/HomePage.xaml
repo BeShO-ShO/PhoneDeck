@@ -114,10 +114,22 @@
             <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
             <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Starts mpv with capture. Device in Settings." />
+                          Text="Opens it when capture starts. Viewer and device in Settings." />
           </StackPanel>
         </ui:CardControl.Header>
         <ui:ToggleSwitch IsChecked="{Binding OpenViewerWithCapture, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      </ui:CardControl>
+
+      <ui:CardControl Icon="{ui:SymbolIcon Speaker224}" Margin="0,0,0,8">
+        <ui:CardControl.Header>
+          <StackPanel>
+            <ui:TextBlock Text="Play the phone's sound" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="From the capture device. Off can mean less delay. Applies when the screen next opens." />
+          </StackPanel>
+        </ui:CardControl.Header>
+        <ui:ToggleSwitch IsChecked="{Binding ViewerSound, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
       </ui:CardControl>
 
       <ui:CardControl Icon="{ui:SymbolIcon Cursor24}">

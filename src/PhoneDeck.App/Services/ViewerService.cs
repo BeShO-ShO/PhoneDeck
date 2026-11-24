@@ -1,22 +1,44 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using PhoneDeck.App.Viewer;
 using PhoneDeck.Core;
 using Windows.Devices.Enumeration;
 
 namespace PhoneDeck.App.Services;
 
 /// <summary>
-/// Starts mpv on the capture device with the low-delay options from the README, plus a control
-/// pipe so touch can follow the picture exactly. PhoneDeck only ever closes an mpv it started.
+/// Shows the capture device, in PhoneDeck's own window (<see cref="CaptureViewer"/>) or in mpv,
+/// as Settings says. mpv gets the low-delay options from the README, plus a control pipe so
+/// touch can follow the picture exactly. PhoneDeck only ever closes an mpv it started.
 /// </summary>
 public sealed class ViewerService
 {
     public static ViewerService Instance { get; } = new();
 
     private Process? _process;
+    private CaptureViewer? _builtIn;
 
-    private ViewerService() { }
+    private ViewerService()
+    {
+        // Picture changes in Settings show in an open viewer straight away.
+        AppSettings.Instance.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(AppSettings.ViewerRange) or nameof(AppSettings.ViewerBrightness)
+                or nameof(AppSettings.ViewerContrast) or nameof(AppSettings.ViewerSaturation))
+                ApplyPicture();
+        };
+    }
+
+    private void ApplyPicture()
+    {
+        var settings = AppSettings.Instance;
+        _builtIn?.SetPicture((PictureRange)settings.ViewerRange,
+            new PictureLevels(settings.ViewerBrightness, settings.ViewerContrast, settings.ViewerSaturation));
+    }
+
+    /// <summary>PhoneDeck's own viewer window is open.</summary>
+    public bool IsBuiltInOpen => _builtIn is { IsOpen: true };
 
     /// <summary>The mpv PhoneDeck started, while it is running.</summary>
     public int? ProcessId
@@ -39,6 +61,18 @@ public sealed class ViewerService
         var settings = AppSettings.Instance;
         if (!settings.OpenViewerWithCapture && !evenIfSwitchedOff) return null;
         if (settings.ViewerVideoDevice is not { } video) return null;
+        var audio = settings.ViewerSound ? settings.ViewerAudioDevice : null;
+
+        if (settings.UseBuiltInViewer)
+        {
+            if (IsBuiltInOpen) return null;
+            _builtIn?.Dispose();
+            log($"viewer: opening the built-in viewer{(audio is null ? " without sound" : "")}");
+            _builtIn = new CaptureViewer(video, audio, log);
+            ApplyPicture();
+            return _builtIn.IsOpen ? null : "PhoneDeck could not open its viewer window. See the log.";
+        }
+
         if (ProcessId is not null) return null;
 
         // Another mpv (your own shortcut, say) already holds the capture device.
@@ -56,7 +90,7 @@ public sealed class ViewerService
         }
 
         var start = new ProcessStartInfo(mpv) { UseShellExecute = false };
-        foreach (var argument in Arguments(video, settings.ViewerAudioDevice)) start.ArgumentList.Add(argument);
+        foreach (var argument in Arguments(video, audio)) start.ArgumentList.Add(argument);
         if (WriteInputConf(log) is { } conf) start.ArgumentList.Add($"--input-conf={conf}");
 
         try
@@ -95,6 +129,10 @@ public sealed class ViewerService
     /// </summary>
     public void SetCaptureMode(bool capturing)
     {
+        _builtIn?.SetCapturing(capturing);
+        // The built-in viewer has no pipe; an mpv from your own shortcut still might.
+        if (IsBuiltInOpen) return;
+
         var request = Interlocked.Increment(ref _modeRequest);
         var pointer = capturing ? PointerHiddenWhileCapturing : PointerHiddenWhenIdle;
         var doubleTap = capturing ? DoubleTapWhileCapturing : DoubleTapWhenIdle;
@@ -181,9 +219,27 @@ public sealed class ViewerService
         }
     }
 
-    /// <summary>Closes the mpv PhoneDeck started, if it is still running.</summary>
+    /// <summary>
+    /// Switches the viewer between full screen and a window: the built-in one directly, mpv
+    /// through its pipe. Returns false if neither answered.
+    /// </summary>
+    public async Task<bool> ToggleFullScreenAsync()
+    {
+        if (_builtIn is { IsOpen: true } viewer)
+        {
+            viewer.ToggleFullScreen();
+            return true;
+        }
+        return await MpvVideoLocator.SendCommandAsync("cycle", "fullscreen");
+    }
+
+    /// <summary>Closes the viewer PhoneDeck opened (its own window, or the mpv it started).</summary>
     public void Stop()
     {
+        var builtIn = _builtIn;
+        _builtIn = null;
+        builtIn?.Dispose();
+
         var process = _process;
         _process = null;
         if (process is null) return;
