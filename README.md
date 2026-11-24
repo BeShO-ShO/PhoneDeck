@@ -22,21 +22,16 @@ navigation buttons.
 
 ## Credits
 
-PhoneDeck is a derivative of **[windows-ble-hid](https://github.com/abhishek-raj/windows-ble-hid)
-by Abhishek Raj**, released under the MIT License. All of the Bluetooth work that makes this
-possible — presenting a Windows PC as a Bluetooth LE keyboard and mouse (HID over GATT), the
-input capture, multi-host switching, lock-key tracking, the CLI and background mode, and the
-research behind them — is his. The full history of the original project is kept in this
-repository, so his commits remain credited to him. His experimental Android companion app is
-not part of PhoneDeck; it is available in the
-[original repository](https://github.com/abhishek-raj/windows-ble-hid).
+PhoneDeck's Bluetooth layer is **[windows-ble-hid](https://github.com/abhishek-raj/windows-ble-hid)
+by Abhishek Raj** (MIT License). His code presents the PC to the phone as a Bluetooth LE
+keyboard and mouse (HID over GATT), and also provides the input capture, multi-host switching,
+lock-key tracking, and the CLI and background mode. PhoneDeck builds the rest around it: the
+capture viewer, Wireless Display support, touch and pen, the navigation bar, and the app
+itself. See [What PhoneDeck adds](#what-phonedeck-adds).
 
-His original README, with the detailed technical background, is kept as
-[docs/ORIGINAL-README.md](docs/ORIGINAL-README.md), and his developer notes are in
-[DEVELOPMENT.md](DEVELOPMENT.md). Paths in both were updated for the rename.
-
-PhoneDeck adds the DeX workflow on top: the built-in viewer and wireless display routes, touch
-and pen, and the button bar. See [What PhoneDeck adds](#what-phonedeck-adds).
+His project's history is kept in this repository, so his commits stay credited to him. His
+original README is in [docs/ORIGINAL-README.md](docs/ORIGINAL-README.md), and his developer
+notes are in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Requirements
 
@@ -111,7 +106,7 @@ DeX to the PC from the phone.
 
 ## What PhoneDeck adds
 
-Compared with windows-ble-hid v0.6.0:
+On top of windows-ble-hid v0.6.0:
 
 - **Touch input**: up to five fingers (pinch-zoom, two-finger scroll), read straight from the
   PC's touchscreen and mapped onto the picture.
@@ -159,8 +154,8 @@ zips to a GitHub release.
 
 ## License and trademarks
 
-MIT — see [LICENSE](LICENSE). Copyright Abhishek Raj (original work) and BeShO-ShO
-(PhoneDeck modifications). The built-in viewer uses
+MIT — see [LICENSE](LICENSE). Copyright BeShO-ShO (PhoneDeck) and Abhishek Raj
+(windows-ble-hid). The built-in viewer uses
 [Vortice.Windows](https://github.com/amerkoleci/Vortice.Windows) and
 [NAudio](https://github.com/naudio/NAudio), both MIT.
 
