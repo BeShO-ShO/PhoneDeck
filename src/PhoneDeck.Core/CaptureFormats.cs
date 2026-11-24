@@ -152,6 +152,24 @@ public static class YuvToRgb
 }
 
 /// <summary>
+/// Finds a capture device's own sound input when none is chosen: Windows gives a device's
+/// camera and microphone the same container id.
+/// </summary>
+public static class CaptureSound
+{
+    // Built-in cameras and microphones all share this "part of the PC" container, so it says
+    // nothing about which belong together.
+    private static readonly Guid BuiltIn = new("00000000-0000-0000-ffff-ffffffffffff");
+
+    /// <returns>The name of the sound input in the video device's container, or null.</returns>
+    public static string? SameDevice(Guid? videoContainer, IEnumerable<(string Name, Guid? Container)> soundInputs)
+    {
+        if (videoContainer is not { } container || container == Guid.Empty || container == BuiltIn) return null;
+        return soundInputs.FirstOrDefault(input => input.Container == container).Name;
+    }
+}
+
+/// <summary>
 /// Picks the mode the built-in viewer asks the capture device for. Smoothness matters most for
 /// the pointer, so frame rate (up to 60) comes first, then size, then a mode that needs no
 /// decoding. Many cheap cards give 1080p at 60 only as MJPG, and raw 1080p only at 5 or 10.

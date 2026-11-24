@@ -146,7 +146,7 @@
         <ComboBox x:Name="VideoDeviceBox" IsEditable="True" Margin="0,0,0,10"
                   Text="{Binding ViewerVideoDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
-        <ui:TextBlock Text="Sound device" FontTypography="Caption" Margin="0,0,0,4" />
+        <ui:TextBlock Text="Sound device (leave empty to use the capture device's own)" FontTypography="Caption" Margin="0,0,0,4" />
         <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,6"
                   Text="{Binding ViewerAudioDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
         <CheckBox Content="Play the sound (off can mean less delay)" Margin="0,0,0,10"

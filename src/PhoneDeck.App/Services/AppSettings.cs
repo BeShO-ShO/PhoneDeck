@@ -166,7 +166,10 @@ public sealed class AppSettings : INotifyPropertyChanged
 
     private string? _viewerAudioDevice;
 
-    /// <summary>The capture device's sound input, or empty for no sound (lowest delay).</summary>
+    /// <summary>
+    /// The sound input to play. Empty means the capture device's own (found by
+    /// <see cref="ViewerService.FindSoundInput"/>); <see cref="ViewerSound"/> turns sound off.
+    /// </summary>
     public string? ViewerAudioDevice
     {
         get => _viewerAudioDevice;

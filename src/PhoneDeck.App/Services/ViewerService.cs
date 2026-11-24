@@ -61,7 +61,14 @@ public sealed class ViewerService
         var settings = AppSettings.Instance;
         if (!settings.OpenViewerWithCapture && !evenIfSwitchedOff) return null;
         if (settings.ViewerVideoDevice is not { } video) return null;
-        var audio = settings.ViewerSound ? settings.ViewerAudioDevice : null;
+        string? audio = null;
+        if (settings.ViewerSound)
+        {
+            audio = settings.ViewerAudioDevice ?? FindSoundInput(video);
+            if (settings.ViewerAudioDevice is null)
+                log(audio is null ? $"viewer: no sound input found on \"{video}\"; choose one in Settings"
+                    : $"viewer: sound from the same device: \"{audio}\"");
+        }
 
         if (settings.UseBuiltInViewer)
         {
@@ -283,6 +290,34 @@ public sealed class ViewerService
             .OrderByDescending(path => path.Contains(native, StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(path => path, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault();
+    }
+
+    private const string ContainerIdKey = "System.Devices.ContainerId";
+
+    /// <summary>
+    /// The sound input built into the same capture device as <paramref name="video"/>, or null.
+    /// Waits briefly on the thread pool: Windows answers in well under a second.
+    /// </summary>
+    public static string? FindSoundInput(string video)
+    {
+        static Guid? Container(DeviceInformation device) =>
+            device.Properties.TryGetValue(ContainerIdKey, out var value) && value is Guid id ? id : null;
+
+        try
+        {
+            var search = Task.Run(async () =>
+            {
+                var keys = new[] { ContainerIdKey };
+                var cameras = await DeviceInformation.FindAllAsync(Windows.Media.Devices.MediaDevice.GetVideoCaptureSelector(), keys);
+                var camera = cameras.FirstOrDefault(device => string.Equals(device.Name, video, StringComparison.OrdinalIgnoreCase));
+                if (camera is null) return null;
+                var inputs = await DeviceInformation.FindAllAsync(Windows.Media.Devices.MediaDevice.GetAudioCaptureSelector(), keys);
+                return CaptureSound.SameDevice(Container(camera),
+                    inputs.Where(device => device.IsEnabled).Select(device => (device.Name, Container(device))));
+            });
+            return search.Wait(TimeSpan.FromSeconds(3)) ? search.Result : null;
+        }
+        catch (Exception) { return null; }
     }
 
     /// <summary>Names Windows gives the cameras and microphones; dshow uses the same ones.</summary>

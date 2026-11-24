@@ -194,6 +194,25 @@ public class CaptureFormatTests
     }
 
     [Fact]
+    public void SoundInputComesFromTheSameDevice()
+    {
+        var card = Guid.NewGuid();
+        var builtIn = new Guid("00000000-0000-0000-ffff-ffffffffffff");
+        var inputs = new (string, Guid?)[]
+        {
+            ("Microphone Array", builtIn),
+            ("Digital Audio Interface (USB3 Digital Audio)", card),
+            ("Headset", null),
+        };
+        Assert.Equal("Digital Audio Interface (USB3 Digital Audio)", CaptureSound.SameDevice(card, inputs));
+        // A built-in camera must not pick the built-in microphone, and unknown means no guess.
+        Assert.Null(CaptureSound.SameDevice(builtIn, inputs));
+        Assert.Null(CaptureSound.SameDevice(null, inputs));
+        Assert.Null(CaptureSound.SameDevice(Guid.Empty, inputs));
+        Assert.Null(CaptureSound.SameDevice(Guid.NewGuid(), inputs));
+    }
+
+    [Fact]
     public void FramesPerSecondHandlesAZeroDenominator()
     {
         Assert.Equal(0, F(CapturePixels.Nv12, 1920, 1080, 60, 0).FramesPerSecond);
