@@ -7,17 +7,21 @@ mouse, touchscreen and pen for an Android phone running a desktop mode such as S
 The PC's input reaches the phone over Bluetooth, as a real keyboard and mouse would, so
 nothing needs installing on the phone and developer options stay off.
 
-It works in either of two ways of showing the phone's screen:
+It works in either of two ways of showing the phone's screen on the PC:
 
 - **Capture device:** the phone's USB-C video output goes into a **USB video capture device**,
-  shown in PhoneDeck's own low-delay viewer. It also shows **work apps that block wireless
-  casting**, since a wired display looks like any monitor to the phone.
+  shown in PhoneDeck's own low-delay viewer. This can be a small USB-C dongle rather than a box.
+  It also shows **work apps that block wireless casting**, since a wired display looks like any
+  monitor to the phone.
 - **Wireless:** the phone casts DeX to the PC over Wi-Fi, and PhoneDeck receives the cast itself
   and shows it in its own window at up to 60 fps. No extra hardware is needed, but there is more
   delay. Windows' **Wireless Display** app is kept as a backup.
 
 Either way, the keyboard, mouse, touch and pen all work, with a button bar for Android's
 navigation buttons.
+
+Or show DeX on **any monitor** and use PhoneDeck only for the PC's keyboard and mouse. See
+[On a separate monitor](#on-a-separate-monitor).
 
 ![Samsung DeX shown on a Windows PC through the Wireless Display app](docs/screenshots/dex-wireless-display.png)
 
@@ -69,7 +73,10 @@ a full-screen button, and a button that turns capture off.
 
 ### Capture device (built-in viewer)
 
-Any USB capture device that Windows sees as a camera should work. Starting capture opens
+Any USB capture device that Windows sees as a camera should work. A **USB-C capture dongle**
+(USB-C in on one end, USB out on the other) is the most compact: plug the phone into it and it
+into the PC. A plain USB-C cable from the phone to the PC can't do this, even one that carries
+video: a PC's USB-C port can send video to a monitor but can't receive it. Starting capture opens
 PhoneDeck's viewer full screen. It picks the device's best mode, reads it with Windows' own
 low-latency capture, and draws each frame on the graphics card as soon as it arrives.
 
@@ -110,6 +117,20 @@ from the phone.
   (Win+Shift+Enter): each of these ends the cast. Covering it with other windows is fine.
 - Use the bar's buttons instead: **full screen** stretches the window over the screen above the
   taskbar, and **send to back** puts it behind your other windows.
+
+### On a separate monitor
+
+DeX can also go straight to a monitor or TV: a USB-C cable that carries video into a portable
+monitor, or a USB-C to HDMI adapter. PhoneDeck then only sends the PC's keyboard and mouse,
+with no capture device or Wi-Fi needed and no added delay.
+
+1. On Home, choose **Capture device** and turn off **Open the phone's screen**, so no viewer
+   opens.
+2. Tap **Connect** on the phone and press **Ctrl+Alt+Q**. The keyboard and mouse now control
+   DeX on the monitor; press it again to return them to the PC.
+
+The PC's touchscreen and pen don't line up with a picture on another monitor, so leave
+**Use the touchscreen** off. A touch monitor may handle touch itself over its USB-C cable.
 
 ## Tips
 
