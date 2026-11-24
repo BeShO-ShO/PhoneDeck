@@ -10,13 +10,6 @@
     <conv:InverseBoolConverter x:Key="InverseBool" />
     <conv:BoolToVisibilityConverter x:Key="InverseBoolToVisibility" Invert="True" />
     <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
-    <Style x:Key="PictureSlider" TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
-      <Setter Property="Minimum" Value="-50" />
-      <Setter Property="Maximum" Value="50" />
-      <Setter Property="TickFrequency" Value="5" />
-      <Setter Property="IsSnapToTickEnabled" Value="True" />
-      <Setter Property="Margin" Value="0,0,0,6" />
-    </Style>
   </Page.Resources>
 
   <StackPanel Margin="16,4,16,16">
@@ -162,23 +155,13 @@
           <ui:TextBlock Text="Picture" FontTypography="BodyStrong" Margin="0,4,0,2" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,8"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Shows at once in an open viewer, with no added delay: the graphics card does it in the same step that scales the picture. Too bright with grey blacks? Try Limited first." />
+                        Text="Black and white levels. Automatic is usually right; if the picture looks washed out with grey blacks, try Limited. Shows at once, with no added delay." />
 
-          <ui:TextBlock Text="Black and white levels" FontTypography="Caption" Margin="0,0,0,4" />
-          <ComboBox SelectedIndex="{Binding ViewerRange, Mode=TwoWay}" Margin="0,0,0,10">
+          <ComboBox SelectedIndex="{Binding ViewerRange, Mode=TwoWay}">
             <ComboBoxItem Content="Automatic" />
             <ComboBoxItem Content="Full (0 to 255)" />
             <ComboBoxItem Content="Limited (16 to 235)" />
           </ComboBox>
-
-          <ui:TextBlock Text="{Binding ViewerBrightness, StringFormat='Brightness: {0}'}" FontTypography="Caption" />
-          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerBrightness, Mode=TwoWay}" />
-          <ui:TextBlock Text="{Binding ViewerContrast, StringFormat='Contrast: {0}'}" FontTypography="Caption" />
-          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerContrast, Mode=TwoWay}" />
-          <ui:TextBlock Text="{Binding ViewerSaturation, StringFormat='Colour: {0}'}" FontTypography="Caption" />
-          <Slider Style="{StaticResource PictureSlider}" Value="{Binding ViewerSaturation, Mode=TwoWay}" />
-
-          <ui:Button Content="Reset picture" Click="OnResetPicture" Margin="0,4,0,0" />
         </StackPanel>
 
         <StackPanel Orientation="Horizontal">

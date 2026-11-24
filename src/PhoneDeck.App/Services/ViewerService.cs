@@ -25,21 +25,17 @@ public sealed class ViewerService
 
     private ViewerService()
     {
-        // Picture changes in Settings show in an open viewer straight away.
+        // A range change in Settings shows in an open viewer straight away.
         AppSettings.Instance.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName is nameof(AppSettings.ViewerRange) or nameof(AppSettings.ViewerBrightness)
-                or nameof(AppSettings.ViewerContrast) or nameof(AppSettings.ViewerSaturation))
-                ApplyPicture();
+            if (args.PropertyName == nameof(AppSettings.ViewerRange)) ApplyPicture();
         };
     }
 
-    private void ApplyPicture()
-    {
-        var settings = AppSettings.Instance;
-        _builtIn?.SetPicture((PictureRange)settings.ViewerRange,
-            new PictureLevels(settings.ViewerBrightness, settings.ViewerContrast, settings.ViewerSaturation));
-    }
+    // Brightness, contrast and colour were removed from Settings, so the levels stay unchanged
+    // (and any saved by an older version are ignored).
+    private void ApplyPicture() =>
+        _builtIn?.SetPicture((PictureRange)AppSettings.Instance.ViewerRange, default);
 
     /// <summary>PhoneDeck's own viewer window is open.</summary>
     public bool IsBuiltInOpen => _builtIn is { IsOpen: true };

@@ -79,8 +79,8 @@ low-latency capture, and draws each frame on the graphics card as soon as it arr
 - **Sound** from the capture device is a switch on Home. Off can mean slightly less delay. On a
   Samsung phone, send DeX's sound to the capture device with **Quick settings → Audio output →
   Display device**.
-- **Picture** settings (black and white levels, brightness, contrast, colour) are in Settings
-  and apply instantly, with no added delay.
+- **Black and white levels** are in Settings: Automatic is usually right, and Limited fixes a
+  washed-out picture with grey blacks. They apply instantly, with no added delay.
 
 **mpv as a backup.** If the built-in viewer doesn't work on your PC, choose **mpv** in Settings →
 Phone's screen. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer recommended) with

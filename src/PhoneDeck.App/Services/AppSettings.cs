@@ -227,32 +227,6 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _viewerRange, Math.Clamp(value, 0, 2))) Save(); }
     }
 
-    private int _viewerBrightness;
-    private int _viewerContrast;
-    private int _viewerSaturation;
-
-    /// <summary>Built-in viewer picture levels, -50 to 50, 0 unchanged. Apply at once.</summary>
-    public int ViewerBrightness
-    {
-        get => _viewerBrightness;
-        set { if (Set(ref _viewerBrightness, ClampLevel(value))) Save(); }
-    }
-
-    public int ViewerContrast
-    {
-        get => _viewerContrast;
-        set { if (Set(ref _viewerContrast, ClampLevel(value))) Save(); }
-    }
-
-    public int ViewerSaturation
-    {
-        get => _viewerSaturation;
-        set { if (Set(ref _viewerSaturation, ClampLevel(value))) Save(); }
-    }
-
-    private static int ClampLevel(int value) =>
-        Math.Clamp(value, PhoneDeck.Core.PictureLevels.Min, PhoneDeck.Core.PictureLevels.Max);
-
     private string? _viewerVideoDevice;
 
     /// <summary>

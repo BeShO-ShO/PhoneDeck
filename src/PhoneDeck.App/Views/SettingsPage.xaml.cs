@@ -110,14 +110,5 @@ public partial class SettingsPage : Page
                 : "Opened. Press f in mpv if it is not full screen.");
     }
 
-    private void OnResetPicture(object sender, RoutedEventArgs e)
-    {
-        var settings = AppSettings.Instance;
-        settings.ViewerRange = 0;
-        settings.ViewerBrightness = 0;
-        settings.ViewerContrast = 0;
-        settings.ViewerSaturation = 0;
-    }
-
     private void OnExit(object sender, RoutedEventArgs e) => App.Current.ExitApplication();
 }
