@@ -14,6 +14,7 @@ internal static class ViewerNative
     public const uint WM_KEYDOWN = 0x0100;
     public const uint WM_TIMER = 0x0113;
     public const uint WM_MOUSEMOVE = 0x0200;
+    public const uint WM_LBUTTONDOWN = 0x0201;
     public const uint WM_LBUTTONDBLCLK = 0x0203;
     public const uint WM_DPICHANGED = 0x02E0;
     public const uint WM_APP = 0x8000;
@@ -31,6 +32,8 @@ internal static class ViewerNative
     public const uint SWP_NOOWNERZORDER = 0x0200;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const uint MONITOR_DEFAULTTOPRIMARY = 1;
+    public const uint MONITOR_DEFAULTTONULL = 0;
+    public const uint WM_EXITSIZEMOVE = 0x0232;
     public const int VK_ESCAPE = 0x1B;
     public const int VK_F11 = 0x7A;
     public const int VK_F = 0x46;

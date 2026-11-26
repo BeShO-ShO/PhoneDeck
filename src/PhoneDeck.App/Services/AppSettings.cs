@@ -61,6 +61,88 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _touchLayerEnabled, value)) Save(); }
     }
 
+    private string? _captureHotkey;
+
+    /// <summary>
+    /// The key combination that turns capture on and off, as text ("Ctrl+Alt+Q"). Null or
+    /// anything unreadable means Ctrl+Alt+Q. Applies at once.
+    /// </summary>
+    public string? CaptureHotkey
+    {
+        get => _captureHotkey;
+        set
+        {
+            var hotkey = Hotkey.Parse(value);
+            // The default is stored as null, so a later change of default reaches everyone.
+            if (!Set(ref _captureHotkey, hotkey == Hotkey.Default ? null : hotkey.ToString())) return;
+            Save();
+            OnPropertyChanged(nameof(CaptureHotkeyText));
+        }
+    }
+
+    [JsonIgnore]
+    public Hotkey CaptureHotkeyValue => Hotkey.Parse(_captureHotkey);
+
+    [JsonIgnore]
+    public string CaptureHotkeyText => CaptureHotkeyValue.ToString();
+
+    private bool _ctrlAltTapReturns = true;
+
+    /// <summary>Tapping Ctrl+Alt with no other key returns input to this PC. Applies the next time capture starts.</summary>
+    public bool CtrlAltTapReturns
+    {
+        get => _ctrlAltTapReturns;
+        set { if (Set(ref _ctrlAltTapReturns, value)) Save(); }
+    }
+
+    private bool _copilotKeyReturns = true;
+
+    /// <summary>The Copilot key returns input to this PC. Applies the next time capture starts.</summary>
+    public bool CopilotKeyReturns
+    {
+        get => _copilotKeyReturns;
+        set { if (Set(ref _copilotKeyReturns, value)) Save(); }
+    }
+
+    private bool _touchOutsideReturns = true;
+
+    /// <summary>A finger landing outside the phone's picture returns input to this PC. Applies the next time capture starts.</summary>
+    public bool TouchOutsideReturns
+    {
+        get => _touchOutsideReturns;
+        set { if (Set(ref _touchOutsideReturns, value)) Save(); }
+    }
+
+    private bool _hideWindowOnCapture = true;
+
+    /// <summary>
+    /// PhoneDeck's window goes to the tray when the phone takes control, instead of behind the
+    /// other windows. It stays there when control comes back; the tray icon opens it.
+    /// </summary>
+    public bool HideWindowOnCapture
+    {
+        get => _hideWindowOnCapture;
+        set { if (Set(ref _hideWindowOnCapture, value)) Save(); }
+    }
+
+    private bool _clickPictureToControl = true;
+
+    /// <summary>Clicking or touching PhoneDeck's viewer while capture is off sends input to the phone.</summary>
+    public bool ClickPictureToControl
+    {
+        get => _clickPictureToControl;
+        set { if (Set(ref _clickPictureToControl, value)) Save(); }
+    }
+
+    private bool _showControlIndicator = true;
+
+    /// <summary>A short note on the picture when control goes to the phone and when it comes back.</summary>
+    public bool ShowControlIndicator
+    {
+        get => _showControlIndicator;
+        set { if (Set(ref _showControlIndicator, value)) Save(); }
+    }
+
     private bool _evenPointerPacing = true;
 
     /// <summary>Spreads pointer motion evenly over reports (see PointerResampler); applies live.</summary>
@@ -225,6 +307,18 @@ public sealed class AppSettings : INotifyPropertyChanged
     {
         get => _viewerRange;
         set { if (Set(ref _viewerRange, Math.Clamp(value, 0, 2))) Save(); }
+    }
+
+    private string? _viewerWindow;
+
+    /// <summary>
+    /// The viewer's last size and place when not full screen ("left,top,width,height" in
+    /// physical pixels), so switching to a window goes back there. Null until first moved.
+    /// </summary>
+    public string? ViewerWindow
+    {
+        get => _viewerWindow;
+        set { if (Set(ref _viewerWindow, value)) Save(); }
     }
 
     private string? _viewerVideoDevice;

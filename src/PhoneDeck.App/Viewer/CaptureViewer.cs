@@ -24,6 +24,7 @@ internal sealed class CaptureViewer : IDisposable
     private const uint WmApplyCursor = WM_APP + 1;
     private const uint WmToggleFullScreen = WM_APP + 2;
     private const uint WmVideoSizeChanged = WM_APP + 3;
+    private const uint WmActivate = WM_APP + 4;
     private static readonly IntPtr IdleTimer = 1;
     private const int IdleHideMs = 1000;
 
@@ -105,8 +106,26 @@ internal sealed class CaptureViewer : IDisposable
     /// </summary>
     public static CaptureViewer ForCast(Action<string> log) => new(log, cast: true);
 
-    /// <summary>Shows the cast's player, or black for null (waiting for the phone).</summary>
-    public void ShowCast(global::Windows.Media.Playback.MediaPlayer? player) => _cast?.Show(player);
+    /// <summary>
+    /// Shows the cast's player, or black for null (waiting for the phone). A retired player is
+    /// closed once the window has let go of it.
+    /// </summary>
+    public void ShowCast(global::Windows.Media.Playback.MediaPlayer? player,
+        global::Windows.Media.Playback.MediaPlayer? retired = null)
+    {
+        if (_cast is { } cast) cast.Show(player, retired);
+        else CloseLater(retired);
+    }
+
+    private void CloseLater(global::Windows.Media.Playback.MediaPlayer? retired)
+    {
+        if (retired is null) return;
+        _ = Task.Run(() =>
+        {
+            try { retired.Dispose(); }
+            catch (Exception ex) { _log($"cast: closing the old player: {ex.Message}"); }
+        });
+    }
 
     /// <summary>The picture's size, for letterboxing and for where touch lands.</summary>
     public void SetVideoSize(int width, int height)
@@ -126,6 +145,9 @@ internal sealed class CaptureViewer : IDisposable
     }
 
     public void ToggleFullScreen() => Post(WmToggleFullScreen);
+
+    /// <summary>Brings the window to the front and gives it the keyboard.</summary>
+    public void Activate() => Post(WmActivate);
 
     /// <summary>Colour range and picture levels; shown from the next frame, with no added delay.</summary>
     public void SetPicture(PictureRange range, PictureLevels levels) => _video?.SetPicture(range, levels);
@@ -158,7 +180,7 @@ internal sealed class CaptureViewer : IDisposable
 
             var primary = MonitorInfo(MonitorFromPoint(new POINT(), MONITOR_DEFAULTTOPRIMARY));
             var screen = primary.rcMonitor;
-            _windowedRect = DefaultWindowedRect(primary.rcWork);
+            _windowedRect = SavedWindowedRect() ?? DefaultWindowedRect(primary.rcWork);
 
             _creating = this;
             var window = CreateWindowEx(0, ClassName, Title, WS_POPUP | WS_VISIBLE,
@@ -235,6 +257,23 @@ internal sealed class CaptureViewer : IDisposable
         return new RECT { Left = left, Top = top, Right = left + width, Bottom = top + height };
     }
 
+    /// <summary>Where the window last was when not full screen, if that is still on a screen.</summary>
+    private static RECT? SavedWindowedRect()
+    {
+        if (WindowPlacement.Parse(Services.AppSettings.Instance.ViewerWindow) is not { } saved) return null;
+        if (!saved.TitleIsOnScreen((x, y) => MonitorFromPoint(new POINT { X = x, Y = y }, MONITOR_DEFAULTTONULL) != IntPtr.Zero))
+            return null;
+        return new RECT { Left = saved.Left, Top = saved.Top, Right = saved.Left + saved.Width, Bottom = saved.Top + saved.Height };
+    }
+
+    /// <summary>Remembers the window's size and place for next time; saved on the UI thread.</summary>
+    private void RememberWindowedRect(RECT rect)
+    {
+        var text = new WindowPlacement(rect.Left, rect.Top, rect.Width, rect.Height).ToString();
+        if (WindowPlacement.Parse(text) is null) return;
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => Services.AppSettings.Instance.ViewerWindow = text);
+    }
+
     private static IntPtr WindowProcedure(IntPtr window, uint message, IntPtr wParam, IntPtr lParam)
     {
         if (!Windows.TryGetValue(window, out var viewer))
@@ -290,14 +329,31 @@ internal sealed class CaptureViewer : IDisposable
                 UpdateRegion();
                 break;
 
+            case WM_EXITSIZEMOVE:
+                // The end of a drag or resize of the window (not of full screen).
+                if (!_fullScreen && !IsIconic(window) && GetWindowRect(window, out var moved))
+                {
+                    _windowedRect = moved;
+                    RememberWindowedRect(moved);
+                }
+                break;
+
             case WM_MOVE:
             case WmVideoSizeChanged:
                 UpdateRegion();
                 break;
 
+            case WM_LBUTTONDOWN:
+                // A click or touch on the picture can hand input to the phone. In the letterbox
+                // bars or with the setting off it is just a click.
+                if (!_capturing && PictureClicked is { } clicked && ClickIsOnPicture(window, lParam)) clicked();
+                break;
+
             case WM_LBUTTONDBLCLK:
-                // While input goes to the phone a double tap belongs to it.
-                if (!_capturing) SetFullScreen(!_fullScreen);
+                // While input goes to the phone a double tap belongs to it. So does the second
+                // click of one that has just handed it over; the black bars still switch.
+                if (!_capturing && !(PictureClicked is not null && ClickIsOnPicture(window, lParam)))
+                    SetFullScreen(!_fullScreen);
                 return 0;
 
             case WM_KEYDOWN:
@@ -309,6 +365,10 @@ internal sealed class CaptureViewer : IDisposable
 
             case WmToggleFullScreen:
                 SetFullScreen(!_fullScreen);
+                return 0;
+
+            case WmActivate:
+                SetForegroundWindow(window);
                 return 0;
 
             case WM_DISPLAYCHANGE:
@@ -345,6 +405,19 @@ internal sealed class CaptureViewer : IDisposable
         return DefWindowProc(window, message, wParam, lParam);
     }
 
+    /// <summary>
+    /// Called on the window's own thread when the picture is clicked or touched while input stays
+    /// on this PC. Null leaves clicks alone.
+    /// </summary>
+    public Action? PictureClicked { get; set; }
+
+    private static bool ClickIsOnPicture(IntPtr window, IntPtr lParam)
+    {
+        var point = new POINT { X = (short)LowWord(lParam), Y = (short)HighWord(lParam) };
+        if (!ClientToScreen(window, ref point)) return false;
+        return VideoRegion.Current is { } picture && picture.Contains(point.X, point.Y);
+    }
+
     private bool PointerHidden => _capturing || _idleHidden;
 
     private void OnMouseMove(IntPtr lParam)
@@ -379,7 +452,11 @@ internal sealed class CaptureViewer : IDisposable
 
         if (fullScreen)
         {
-            if (GetWindowRect(_window, out var rect)) _windowedRect = rect;
+            if (!IsIconic(_window) && GetWindowRect(_window, out var rect))
+            {
+                _windowedRect = rect;
+                RememberWindowedRect(rect);
+            }
             SetWindowLongPtr(_window, GWL_STYLE, unchecked((IntPtr)(int)(WS_POPUP | WS_VISIBLE)));
             _fullScreen = true;
             FitToMonitor();

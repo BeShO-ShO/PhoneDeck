@@ -57,6 +57,39 @@
       <ui:ToggleSwitch IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
     </ui:CardControl>
 
+    <ui:Card Margin="0,0,0,8" Padding="16,12,16,16">
+      <StackPanel>
+        <ui:TextBlock Text="Switching between the phone and this PC" FontTypography="BodyStrong" />
+        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,2,0,12"
+                      Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                      Text="How the keyboard and mouse go to the phone and come back. Changes apply the next time capture starts." />
+
+        <ui:TextBlock Text="Hotkey that turns it on and off (click the box, then press the new keys)" FontTypography="Caption" Margin="0,0,0,4" />
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBox x:Name="HotkeyBox" Width="200" IsReadOnly="True" IsReadOnlyCaretVisible="False"
+                   FontFamily="Cascadia Mono, Consolas"
+                   GotKeyboardFocus="OnHotkeyBoxFocused" LostKeyboardFocus="OnHotkeyBoxUnfocused"
+                   PreviewKeyDown="OnHotkeyBoxKey" />
+          <ui:Button Content="Reset to Ctrl+Alt+Q" Margin="8,0,0,0" Click="OnResetHotkey" />
+        </StackPanel>
+        <ui:TextBlock x:Name="HotkeyStatus" FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,10"
+                      Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+
+        <CheckBox Content="Click or touch the phone's picture to control the phone" Margin="0,0,0,6"
+                  IsChecked="{Binding ClickPictureToControl, Mode=TwoWay}" />
+        <CheckBox Content="Tap Ctrl+Alt (on their own) to return to this PC" Margin="0,0,0,6"
+                  IsChecked="{Binding CtrlAltTapReturns, Mode=TwoWay}" />
+        <CheckBox Content="The Copilot key returns to this PC (on keyboards that have one)" Margin="0,0,0,6"
+                  IsChecked="{Binding CopilotKeyReturns, Mode=TwoWay}" />
+        <CheckBox Content="Touch the screen outside the picture to return to this PC" Margin="0,0,0,6"
+                  IsChecked="{Binding TouchOutsideReturns, Mode=TwoWay}" />
+        <CheckBox Content="Hide PhoneDeck's window to the tray when the phone takes control" Margin="0,0,0,6"
+                  IsChecked="{Binding HideWindowOnCapture, Mode=TwoWay}" />
+        <CheckBox Content="Show a short note when control changes hands"
+                  IsChecked="{Binding ShowControlIndicator, Mode=TwoWay}" />
+      </StackPanel>
+    </ui:Card>
+
     <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
       <ui:CardControl.Header>
         <StackPanel>
@@ -75,7 +108,7 @@
           <ui:TextBlock Text="Switch target with Ctrl+Alt+CapsLock" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Cycles between this PC and each paired device while capture stays on. Only useful with more than one device: with one phone, Ctrl+Alt+Q already switches. Applies the next time capture starts." />
+                        Text="Cycles between this PC and each paired device while capture stays on. Only useful with more than one device: with one phone, the hotkey above already switches. Applies the next time capture starts." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:ToggleSwitch IsChecked="{Binding EnableCapsLockSwitch, Mode=TwoWay}" />
@@ -155,7 +188,7 @@
           <ui:TextBlock Text="Picture" FontTypography="BodyStrong" Margin="0,4,0,2" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,8"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Black and white levels. Automatic is usually right; if the picture looks washed out with grey blacks, try Limited. Shows at once, with no added delay." />
+                        Text="Black and white levels. If colours look too strong, with crushed blacks, try Full. If the picture looks washed out with grey blacks, try Limited. Shows at once, with no added delay." />
 
           <ComboBox SelectedIndex="{Binding ViewerRange, Mode=TwoWay}">
             <ComboBoxItem Content="Automatic" />

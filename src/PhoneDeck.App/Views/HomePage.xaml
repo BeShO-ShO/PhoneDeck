@@ -67,7 +67,7 @@
       <StackPanel Orientation="Horizontal">
         <ui:SymbolIcon Symbol="Play24" Margin="0,0,8,0" VerticalAlignment="Center" />
         <TextBlock Text="{Binding CaptureButtonText}" FontSize="15" VerticalAlignment="Center" />
-        <TextBlock Text="Ctrl+Alt+Q" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+        <TextBlock Text="{Binding CaptureHotkeyText, Source={x:Static services:AppSettings.Instance}}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
                    Opacity="0.8" Margin="12,0,0,0" VerticalAlignment="Center" />
       </StackPanel>
     </ui:Button>

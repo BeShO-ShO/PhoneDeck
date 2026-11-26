@@ -408,7 +408,10 @@ public sealed class PeripheralService : INotifyPropertyChanged
                     touchGoesToHost: touchGoesToHost,
                     capsLockSwitch: AppSettings.Instance.EnableCapsLockSwitch,
                     evenPacing: () => AppSettings.Instance.EvenPointerPacing,
-                    penGoesToHost: penGoesToHost);
+                    penGoesToHost: penGoesToHost,
+                    stopHotkey: settings.CaptureHotkeyValue,
+                    ctrlAltTapReturns: settings.CtrlAltTapReturns,
+                    copilotKeyReturns: settings.CopilotKeyReturns);
             }
             catch (Exception ex)
             {

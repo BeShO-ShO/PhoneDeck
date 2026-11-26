@@ -37,6 +37,17 @@ public sealed class ViewerService
     private void ApplyPicture() =>
         _builtIn?.SetPicture((PictureRange)AppSettings.Instance.ViewerRange, default);
 
+    /// <summary>
+    /// The picture in PhoneDeck's own viewer was clicked or touched while input stayed on this
+    /// PC. Raised on the viewer's thread.
+    /// </summary>
+    public event Action? PictureClicked;
+
+    private void OnPictureClicked() => PictureClicked?.Invoke();
+
+    /// <summary>Makes PhoneDeck's own viewer the active window, if it is open.</summary>
+    public void Activate() => _builtIn?.Activate();
+
     /// <summary>PhoneDeck's own viewer window is open.</summary>
     public bool IsBuiltInOpen => _builtIn is { IsOpen: true };
 
@@ -79,7 +90,7 @@ public sealed class ViewerService
             if (IsBuiltInOpen) return null;
             _builtIn?.Dispose();
             log($"viewer: opening the built-in viewer{(audio is null ? " without sound" : "")}");
-            _builtIn = new CaptureViewer(video, audio, log);
+            _builtIn = new CaptureViewer(video, audio, log) { PictureClicked = OnPictureClicked };
             _builtInIsCast = false;
             ApplyPicture();
             return _builtIn.IsOpen ? null : "PhoneDeck could not open its viewer window. See the log.";
@@ -250,27 +261,48 @@ public sealed class ViewerService
     /// Shows the cast (or black, waiting, for null) in the viewer window, opening it if needed.
     /// UI thread. Returns a problem to show, or null.
     /// </summary>
-    public string? ShowCast(MediaPlayer? player, Action<string> log)
+    /// <param name="retired">
+    /// The player this one replaces. It is closed only after the window has let go of it.
+    /// </param>
+    public string? ShowCast(MediaPlayer? player, Action<string> log, MediaPlayer? retired = null)
     {
-        // A cast arriving after the route changed away is not shown.
-        if (AppSettings.Instance.DisplayRoute != DisplayRoute.Cast) return null;
-        // The phone dropping out leaves an open window black; it never opens one.
-        if (player is null && !IsBuiltInOpen) return null;
-        return EnsureCastWindow(player, log);
+        // A cast arriving after the route changed away is not shown; one that ended never opens a
+        // window. Either way nothing is drawing the old player, so it can simply be closed.
+        if (AppSettings.Instance.DisplayRoute != DisplayRoute.Cast || (player is null && !IsBuiltInOpen))
+        {
+            CloseLater(retired);
+            return null;
+        }
+        return EnsureCastWindow(player, log, retired);
     }
 
-    private string? EnsureCastWindow(MediaPlayer? player, Action<string> log)
+    private static void CloseLater(MediaPlayer? retired)
+    {
+        if (retired is null) return;
+        _ = Task.Run(() =>
+        {
+            try { retired.Dispose(); }
+            catch (Exception) { /* Already closed with its session. */ }
+        });
+    }
+
+    private string? EnsureCastWindow(MediaPlayer? player, Action<string> log, MediaPlayer? retired = null)
     {
         if (!(IsBuiltInOpen && _builtInIsCast))
         {
             _builtIn?.Dispose();
             log("viewer: opening the cast window");
             _builtIn = CaptureViewer.ForCast(log);
+            _builtIn.PictureClicked = OnPictureClicked;
             _builtInIsCast = true;
             _builtIn.SetCapturing(_capturing);
-            if (!_builtIn.IsOpen) return "PhoneDeck could not open its viewer window. See the log.";
+            if (!_builtIn.IsOpen)
+            {
+                CloseLater(retired);
+                return "PhoneDeck could not open its viewer window. See the log.";
+            }
         }
-        _builtIn!.ShowCast(player);
+        _builtIn!.ShowCast(player, retired);
         return null;
     }
 

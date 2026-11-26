@@ -5,7 +5,7 @@ namespace PhoneDeck.Core;
 
 /// <summary>
 /// Captures local keyboard and mouse input via low-level hooks and translates it to HID reports.
-/// Input is swallowed while capturing; Ctrl+Alt+Q releases it.
+/// Input is swallowed while capturing; the stop hotkey (Ctrl+Alt+Q by default) releases it.
 /// </summary>
 public sealed class InputCapture : IDisposable
 {
@@ -62,6 +62,9 @@ public sealed class InputCapture : IDisposable
     private int _lastLocalX, _lastLocalY;
     private bool _haveLocalPoint;
     private Func<int> _now = () => Environment.TickCount;
+    // Both ways back are off unless asked for, so the CLI keeps its old behaviour.
+    private readonly ReturnKeyDetector _returnKeys = new() { CtrlAltTap = false, CopilotKey = false };
+    private Hotkey _stopHotkey = Hotkey.Default;
 
     public event Action<KeyModifiers, byte[]>? KeyboardReport;
     public event Action<MouseButtons, int, int, int>? MouseReport;
@@ -84,7 +87,21 @@ public sealed class InputCapture : IDisposable
         // being performed, and local deltas need a fresh reference point either way.
         _gesture?.Reset();
         _haveLocalPoint = false;
+        _returnKeys.Reset();
         RequestMouseHookSync();
+    }
+
+    /// <summary>The key combination that ends capture (Ctrl+Alt+Q by default). Set before <see cref="Start"/>.</summary>
+    public void SetStopHotkey(Hotkey hotkey) => _stopHotkey = hotkey.IsValid ? hotkey : Hotkey.Default;
+
+    /// <summary>
+    /// Turns on the one-press ways back to this PC: tapping Ctrl+Alt alone, and the Copilot key.
+    /// Either ends capture as the stop hotkey does. Set before <see cref="Start"/>.
+    /// </summary>
+    public void SetReturnKeys(bool ctrlAltTap, bool copilotKey)
+    {
+        _returnKeys.CtrlAltTap = ctrlAltTap;
+        _returnKeys.CopilotKey = copilotKey;
     }
 
     /// <summary>
@@ -431,6 +448,18 @@ public sealed class InputCapture : IDisposable
         if (isDown) _pressedVirtualKeys.Add(virtualKey);
         else _pressedVirtualKeys.Remove(virtualKey);
 
+        // Fed every key, so a third key or a gesture held across a target change spoils it.
+        var copilotPart = !_passThrough && _returnKeys.CopilotKey && virtualKey == ReturnKeyDetector.F23;
+        if (_returnKeys.Feed(virtualKey, isDown, scanCode) && !_passThrough)
+        {
+            // The last key of the gesture is coming up; its press went to the phone, so the
+            // release must not reach Windows either.
+            _pressedVirtualKeys.Clear();
+            ReleaseHeldInput();
+            StopRequested?.Invoke();
+            return !releaseLocally;
+        }
+
         if (virtualKey == 0x14 && _capsLockSwitchEnabled)
         {
             if (_capsLockSwitchLatched)
@@ -447,7 +476,7 @@ public sealed class InputCapture : IDisposable
             }
         }
 
-        if (isDown && virtualKey == 0x51 && IsDown(0x11) && IsDown(0x12)) // Ctrl+Alt+Q
+        if (isDown && _stopHotkey.Matches(virtualKey, HeldModifiers()))
         {
             _pressedVirtualKeys.Clear();
             ReleaseHeldInput();
@@ -474,6 +503,9 @@ public sealed class InputCapture : IDisposable
             if (isDown) _localPressedVirtualKeys.Add(virtualKey);
             return false;
         }
+
+        // The Copilot key's F23 is only ever the way back, never a key for the phone.
+        if (copilotPart) return !releaseLocally;
 
         if (VirtualKeyMap.TryGetUsage(virtualKey, scanCode, extended, out var usage))
         {
@@ -572,6 +604,8 @@ public sealed class InputCapture : IDisposable
     {
         var releaseLocally = !isDown && (_localButtons & button) != MouseButtons.None;
         if (!isDown) _localButtons &= ~button;
+        // Ctrl+Alt+click is not a tap of Ctrl+Alt.
+        if (isDown) _returnKeys.Spoil();
 
         if (_passThrough)
         {
@@ -654,6 +688,7 @@ public sealed class InputCapture : IDisposable
                 break;
 
             case WM_MOUSEWHEEL:
+                _returnKeys.Spoil();
                 var notches = TakeWheelNotches((short)((data.mouseData >> 16) & 0xFFFF));
                 if (notches != 0) MouseReport?.Invoke(_buttons, 0, 0, notches);
                 break;
@@ -668,6 +703,16 @@ public sealed class InputCapture : IDisposable
         0x12 => _pressedVirtualKeys.Contains(0xA4) || _pressedVirtualKeys.Contains(0xA5),
         _ => _pressedVirtualKeys.Contains(virtualKey)
     };
+
+    private HotkeyModifiers HeldModifiers()
+    {
+        var held = HotkeyModifiers.None;
+        if (IsDown(0x11)) held |= HotkeyModifiers.Ctrl;
+        if (IsDown(0x12)) held |= HotkeyModifiers.Alt;
+        if (_pressedVirtualKeys.Contains(0xA0) || _pressedVirtualKeys.Contains(0xA1)) held |= HotkeyModifiers.Shift;
+        if (_pressedVirtualKeys.Contains(0x5B) || _pressedVirtualKeys.Contains(0x5C)) held |= HotkeyModifiers.Win;
+        return held;
+    }
 
     private KeyModifiers CurrentModifiers()
     {

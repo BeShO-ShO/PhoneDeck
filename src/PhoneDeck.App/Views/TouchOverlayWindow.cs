@@ -53,12 +53,17 @@ public sealed class TouchOverlayWindow : Window
     private readonly Stopwatch _sinceTouchSent = Stopwatch.StartNew();
     private HashSet<int> _queuedSlots = [];
     private bool _pumping;
+    private readonly Action _stopCapture;
+    // Null when a touch outside the picture is not a way back, and once it has been used.
+    private OutsideTouchDetector? _outside;
 
     public TouchOverlayWindow(Func<IReadOnlyList<TouchPoint>, Task> sendTouch, Func<PenFlags, int, int, int, Task> sendPen,
         Func<IReadOnlyList<KeyTap>, Task> sendKeys, Action stopCapture, Action<string> log, string targetName,
-        Func<int?> viewerProcessId, bool wireless)
+        Func<int?> viewerProcessId, bool wireless, bool touchOutsideReturns)
     {
         _wireless = wireless;
+        _stopCapture = stopCapture;
+        _outside = touchOutsideReturns ? new OutsideTouchDetector() : null;
         _sendTouch = sendTouch;
         _sendPen = sendPen;
         _sendKeys = sendKeys;
@@ -75,7 +80,7 @@ public sealed class TouchOverlayWindow : Window
         Width = wireless ? 800 : 720;
 
         var pauseButton = MakeButton("Stop capture", PauseIcon);
-        pauseButton.Click += (_, _) => stopCapture();
+        pauseButton.Click += (_, _) => _stopCapture();
 
         var fullScreenButton = MakeButton(wireless ? "Fill the screen or restore the window" : "Full screen or window", FullScreenIcon);
         fullScreenButton.Click += (_, _) => _ = ToggleFullScreenAsync();
@@ -280,15 +285,33 @@ public sealed class TouchOverlayWindow : Window
 
     private void OnFrame(IReadOnlyList<RawContact> frame)
     {
-        // The wireless display sends touch to the phone itself; sending it too would double it.
-        if (_wireless) return;
         var onScreen = frame.Select(contact =>
         {
             var (x, y) = ToScreen(contact.X, contact.Y);
             return contact with { X = x, Y = y };
         }).ToList();
 
+        // A finger landing away from the picture and the bar hands input back to this PC.
+        if (_outside?.Update(onScreen, (x, y) => VideoRegion.Resolve().Contains(x, y), IsOnBar) == true)
+        {
+            _outside = null;
+            _log("touch outside the picture: input back to this PC");
+            _stopCapture();
+            return;
+        }
+
+        // The wireless display sends touch to the phone itself; sending it too would double it.
+        if (_wireless) return;
+
         if (_tracker.Update(onScreen, VideoRegion.IsOnVideo) is { } output) EnqueueTouch(output);
+    }
+
+    /// <summary>The bar in physical pixels, which is how touch arrives.</summary>
+    private bool IsOnBar(double x, double y)
+    {
+        if (!IsLoaded) return false;
+        var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        return new VideoRect(Left * scale, Top * scale, ActualWidth * scale, ActualHeight * scale).Contains(x, y);
     }
 
     private void OnPen(RawPen pen)

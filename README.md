@@ -61,13 +61,33 @@ Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
    radio and add mouse lag.
 3. On Home, choose **Capture device** or **Wireless** to show the phone's screen. For a capture
    device, pick it in Settings → Phone's screen.
-4. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then press
-   **Ctrl+Alt+Q** (or **Start capture**). Press it again to return input to the PC.
+4. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then click the phone's
+   picture, press **Ctrl+Alt+Q** or choose **Start capture**. See [Switching](#switching) for
+   the ways back.
 
 <img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: two connected phones, Start capture, where input goes, and how the phone's screen is shown" width="360">
 
 While capture is on, a small bar below the picture has **Split screen, Recents, Home and Back**,
 a full-screen button, and a button that turns capture off.
+
+## Switching
+
+To give the phone the keyboard and mouse:
+- click or touch the phone's picture in PhoneDeck's viewer, or
+- press **Ctrl+Alt+Q**.
+
+A short note and a red tray icon show that the phone has control. PhoneDeck's own window goes to
+the tray so it doesn't cover the picture; open it again from the tray icon.
+
+To return them to the PC:
+- tap **Ctrl+Alt** on their own, which every keyboard has,
+- press the **Copilot key**, on keyboards that have one,
+- touch the screen outside the picture,
+- press **Ctrl+Alt+Q**, or
+- use the bar's stop button.
+
+You can change the hotkey in Settings → Switching between the phone and this PC, and turn each
+of these ways on or off there.
 
 ## Showing the phone's screen
 
@@ -80,14 +100,15 @@ video: a PC's USB-C port can send video to a monitor but can't receive it. Start
 PhoneDeck's viewer full screen. It picks the device's best mode, reads it with Windows' own
 low-latency capture, and draws each frame on the graphics card as soon as it arrives.
 
-- **Double-click, F11 or F** switches between full screen and a window; **Esc** leaves full
-  screen. While input goes to the phone, double taps belong to the phone and the bar's
-  full-screen button does it instead.
+- **F11 or F** switches between full screen and a window; **Esc** leaves full screen. A click on
+  the picture gives the phone control, so double-click the black bars (or use the bar's
+  full-screen button) to switch with the mouse.
 - **Sound** from the capture device is a switch on Home. Off can mean slightly less delay. On a
   Samsung phone, send DeX's sound to the capture device with **Quick settings → Audio output →
   Display device**.
-- **Black and white levels** are in Settings: Automatic is usually right, and Limited fixes a
-  washed-out picture with grey blacks. They apply instantly, with no added delay.
+- **Black and white levels** are in Settings. Automatic guesses; capture devices often don't say
+  which they send. If colours look too strong, with crushed blacks, choose Full. If the picture
+  looks washed out with grey blacks, choose Limited. They apply instantly, with no added delay.
 
 **mpv as a backup.** If the built-in viewer doesn't work on your PC, choose **mpv** in Settings →
 Phone's screen. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer recommended) with
@@ -150,7 +171,8 @@ On top of windows-ble-hid v0.6.0:
 - **Two ways to show the phone**: a built-in low-delay capture viewer (with mpv as a backup), or
   its own wireless cast receiver (with Windows' Wireless Display app as a backup).
 - **Navigation bar** for Android: Split screen, Recents, Home and Back.
-- **Ctrl+Alt+Q** toggles capture on and off, and always turns on to the phone.
+- **Quick switching**: click the picture to control the phone; tap Ctrl+Alt, press the Copilot
+  key or touch outside the picture to come back. The Ctrl+Alt+Q hotkey can be changed.
 - **Lower pointer delay**: the fastest Bluetooth link the phone allows (Windows 11), and pointer
   motion spread evenly across reports so Android's acceleration sees a steady speed.
 - **Reliability**: held keys and buttons are released on stop, and the last phone is reselected
@@ -175,6 +197,10 @@ zips to a GitHub release.
 - **Input stops reaching the phone, but PhoneDeck shows it connected**: restart the phone.
 - **The phone pairs only as an audio device**: forget the PC on the phone, remove the phone in
   Windows' Bluetooth settings, then pair again with PhoneDeck open.
+- **The phone's on-screen keyboard doesn't appear while PhoneDeck is connected**: the phone sees
+  PhoneDeck as a physical keyboard. With Gboard, turn on its own setting to show the keyboard
+  while a physical keyboard is connected (in Gboard's settings, not Android's physical keyboard
+  settings).
 - **Pen does nothing** after updating from an older PhoneDeck: pair again as above. Fingers work
   without re-pairing.
 - **No picture in the built-in viewer**: check the device in Settings → Phone's screen, and close

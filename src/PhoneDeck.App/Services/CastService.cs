@@ -22,6 +22,7 @@ public sealed class CastService
     private Action<string> _log = _ => { };
     private MiracastReceiverSession? _session;
     private MediaPlayer? _player;
+    private MiracastReceiverConnection? _connection;
     private string? _phone;
     private int _generation;
     private bool _starting;
@@ -128,7 +129,11 @@ public sealed class CastService
     private void OnConnectionCreated(MiracastReceiverSession sender, MiracastReceiverConnectionCreatedEventArgs args)
     {
         var name = args.Connection.Transmitter.Name;
-        lock (_gate) _phone = name;
+        lock (_gate)
+        {
+            _phone = name;
+            _connection = args.Connection;
+        }
         _log($"cast: {name} connected");
     }
 
@@ -156,9 +161,10 @@ public sealed class CastService
             _player = player;
             phone = _phone;
         }
-        old?.Dispose();
 
-        OnUiThread(() => ViewerService.Instance.ShowCast(player, _log));
+        // The old player is closed by the viewer once it has stopped drawing it; closing it here
+        // while the window still used it hung the window when the phone left DeX.
+        OnUiThread(() => ViewerService.Instance.ShowCast(player, _log, retired: old));
         // The phone waits for the receiver to start playing, and gives up after about half a minute.
         player.Play();
         SetStatus(new CastStatus(CastState.Connected, phone));
@@ -172,10 +178,10 @@ public sealed class CastService
             old = _player;
             _player = null;
             _phone = null;
+            _connection = null;
         }
         _log("cast: the phone disconnected");
-        OnUiThread(() => ViewerService.Instance.ShowCast(null, _log));
-        old?.Dispose();
+        OnUiThread(() => ViewerService.Instance.ShowCast(null, _log, retired: old));
         lock (_gate)
         {
             if (_session is null) return;
@@ -188,6 +194,7 @@ public sealed class CastService
     {
         MiracastReceiverSession? session;
         MediaPlayer? player;
+        MiracastReceiverConnection? connection;
         lock (_gate)
         {
             _generation++;
@@ -195,6 +202,8 @@ public sealed class CastService
             _session = null;
             player = _player;
             _player = null;
+            connection = _connection;
+            _connection = null;
             _phone = null;
         }
 
@@ -204,6 +213,18 @@ public sealed class CastService
             session.ConnectionCreated -= OnConnectionCreated;
             session.MediaSourceCreated -= OnMediaSourceCreated;
             session.Disconnected -= OnDisconnected;
+        }
+        // Ends the cast on the phone as its own Disconnect would. Just dropping the session looks
+        // to the phone like a lost link, so it cast again at once, and with PhoneDeck gone Windows
+        // opened its Wireless Display app to take it.
+        if (connection is not null)
+        {
+            try
+            {
+                connection.Disconnect(MiracastReceiverDisconnectReason.DisconnectedByUser);
+                _log("cast: ended the cast on the phone");
+            }
+            catch (Exception ex) { _log($"cast: ending the cast: {ex.Message}"); }
         }
         player?.Dispose();
         try { session?.Dispose(); }

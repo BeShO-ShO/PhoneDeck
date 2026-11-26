@@ -179,7 +179,8 @@ public static class CaptureSession
     /// Read per report rather than captured, so the UI can retune pacing without restarting.
     /// </param>
     /// <param name="stopEndsSession">
-    /// Console mode ends on Ctrl+Alt+Q. Background mode has no console to return to, so the
+    /// Console mode ends on the stop hotkey (Ctrl+Alt+Q unless <paramref name="stopHotkey"/> says
+    /// otherwise). Background mode has no console to return to, so the
     /// same hotkey drops to the local target instead and capture keeps running.
     /// </param>
     /// <param name="chordSwitch">Whether Ctrl+D+C switches target as well as Ctrl+Alt+CapsLock.</param>
@@ -199,10 +200,16 @@ public static class CaptureSession
         bool touchGoesToHost = false,
         bool capsLockSwitch = true,
         Func<bool>? evenPacing = null,
-        bool? penGoesToHost = null)
+        bool? penGoesToHost = null,
+        Hotkey? stopHotkey = null,
+        bool ctrlAltTapReturns = false,
+        bool copilotKeyReturns = false)
     {
         evenPacing ??= () => true;
+        var hotkey = stopHotkey is { IsValid: true } chosen ? chosen : Hotkey.Default;
         using var capture = new InputCapture { Verbose = verbose };
+        capture.SetStopHotkey(hotkey);
+        capture.SetReturnKeys(ctrlAltTapReturns, copilotKeyReturns);
         capture.SetChordSwitch(chordSwitch);
         capture.SetCapsLockSwitch(capsLockSwitch);
         capture.SetTouchGoesToHost(touchGoesToHost);
@@ -399,9 +406,11 @@ public static class CaptureSession
             var switchKeys = new[] { capsLockSwitch ? "Ctrl+Alt+CapsLock" : null, chordSwitch ? "Ctrl+D+C" : null }
                 .Where(key => key is not null).ToList();
             if (switchKeys.Count > 0) log($"  {string.Join(" or ", switchKeys)} switches target.");
+            var ways = new[] { hotkey.ToString(), ctrlAltTapReturns ? "a tap of Ctrl+Alt" : null,
+                copilotKeyReturns ? "the Copilot key" : null }.Where(way => way is not null);
             log(stopEndsSession
-                ? "  capturing - Ctrl+Alt+Q stops."
-                : "  capturing - Ctrl+Alt+Q returns input to this PC.");
+                ? $"  capturing - {string.Join(" or ", ways)} stops."
+                : $"  capturing - {string.Join(" or ", ways)} returns input to this PC.");
 
             capture.Start();
             await stopped.Task;

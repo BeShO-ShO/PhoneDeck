@@ -50,8 +50,31 @@ internal sealed class CastPicture : IDisposable
         Resize(width, height);
     }
 
-    /// <summary>Shows the player's picture, or black for null. Callable from any thread.</summary>
-    public void Show(MediaPlayer? player) => _queue.TryEnqueue(() => Attach(player));
+    /// <summary>
+    /// Shows the player's picture, or black for null. Callable from any thread.
+    /// <paramref name="retired"/> is a player the cast has finished with: it is closed only after
+    /// this window has let go of its picture, and off this thread. Closing it while the window
+    /// still drew from it hung the window when the phone left DeX.
+    /// </summary>
+    public void Show(MediaPlayer? player, MediaPlayer? retired = null)
+    {
+        if (!_queue.TryEnqueue(() =>
+            {
+                Attach(player);
+                Retire(retired);
+            }))
+            Retire(retired);
+    }
+
+    private void Retire(MediaPlayer? retired)
+    {
+        if (retired is null || ReferenceEquals(retired, _player)) return;
+        _ = Task.Run(() =>
+        {
+            try { retired.Dispose(); }
+            catch (Exception ex) { _log($"cast: closing the old player: {ex.Message}"); }
+        });
+    }
 
     /// <summary>The cast's width over height. Callable from any thread.</summary>
     public void SetAspect(double aspect) => _queue.TryEnqueue(() =>
@@ -73,6 +96,8 @@ internal sealed class CastPicture : IDisposable
     {
         if (_disposed || ReferenceEquals(player, _player)) return;
         Detach();
+        // A cast that has ended leaves the window black rather than holding a closing player.
+        if (player is null) return;
         _player = player;
         if (player is null) return;
 

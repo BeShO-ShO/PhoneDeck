@@ -18,8 +18,8 @@ public partial class App : Application
     private bool _exiting;
     private TouchOverlayWindow? _touchLayer;
     private CaptureHotkey? _captureHotkey;
+    private ControlIndicator? _indicator;
     private bool _redirectUiActive;
-    private bool _restoreWindowAfterRedirect;
     private bool _redirectWireless;
 
     public new static App Current => (App)Application.Current;
@@ -27,6 +27,9 @@ public partial class App : Application
     public TrayIconService? Tray { get; private set; }
 
     public bool IsExiting => _exiting;
+
+    /// <summary>Settings turns the hotkey off while it records a new one.</summary>
+    public CaptureHotkey? HotkeyRegistration => _captureHotkey;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -51,7 +54,16 @@ public partial class App : Application
         base.OnStartup(e);
 
         Tray = new TrayIconService(ShowMainWindow, ExitApplication);
-        _captureHotkey = new CaptureHotkey(OnCaptureHotkey, PeripheralService.Instance.LogApp);
+        _captureHotkey = new CaptureHotkey(AppSettings.Instance.CaptureHotkeyValue, OnCaptureHotkey,
+            PeripheralService.Instance.LogApp);
+        _indicator = new ControlIndicator();
+        AppSettings.Instance.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(AppSettings.CaptureHotkey))
+                _captureHotkey?.Change(AppSettings.Instance.CaptureHotkeyValue);
+        };
+        // A click or touch on PhoneDeck's own viewer hands input to the phone.
+        ViewerService.Instance.PictureClicked += () => Dispatcher.BeginInvoke(OnPictureClicked);
 
         // The tray is the only surface visible while the window is hidden, which is exactly when
         // a lock left on a remote host would otherwise go unnoticed.
@@ -150,9 +162,15 @@ public partial class App : Application
         if (peripheral.IsRedirecting && !_redirectUiActive && !_exiting)
         {
             _redirectUiActive = true;
-            // The main window would otherwise sit on top of the video, with or without the layer.
-            _restoreWindowAfterRedirect = MainWindow?.IsVisible == true;
-            MainWindow?.Hide();
+            Tray?.SetLive(true);
+            // The main window would otherwise sit on top of the video. It goes to the tray (or, with
+            // that setting off, behind everything), and nothing brings it back afterwards.
+            var mainWasActive = MainWindow is { IsVisible: true, IsActive: true };
+            if (MainWindow is { IsVisible: true } main)
+            {
+                if (AppSettings.Instance.HideWindowOnCapture) main.Hide();
+                else SendToBack(main);
+            }
 
             // In wireless mode the bar is the only way to reach fill screen and send to back, and
             // the pen, so it shows whatever the touch switch says.
@@ -168,27 +186,61 @@ public partial class App : Application
                 // with PhoneDeck.
                 if (ViewerService.Instance.EnsureRunning(peripheral.LogApp) is { } problem) Tray?.ShowMessage(problem);
                 ViewerService.Instance.SetCaptureMode(true);
-                if (!AppSettings.Instance.TouchLayerEnabled) return;
+                // Started from the main window's button: the viewer takes over as the active
+                // window, so its keys (F11, F, Esc) work once control comes back.
+                if (mainWasActive) ViewerService.Instance.Activate();
             }
+
+            if (AppSettings.Instance.ShowControlIndicator) _indicator?.Show(ControlMessage(peripheral.Target));
+            if (!_redirectWireless && !AppSettings.Instance.TouchLayerEnabled) return;
 
             // The bar's X matches Ctrl+Alt+Q: capture stops but PhoneDeck keeps running, so the same
             // keys turn it straight back on.
             _touchLayer = new TouchOverlayWindow(peripheral.SendTouchFrameAsync, peripheral.SendPenAsync,
                 peripheral.SendKeyTapsAsync, () => _ = peripheral.StopCaptureAsync(), peripheral.LogTouch,
-                peripheral.Target, () => ViewerService.Instance.ProcessId, _redirectWireless);
+                peripheral.Target, () => ViewerService.Instance.ProcessId, _redirectWireless,
+                AppSettings.Instance.TouchOutsideReturns);
             _touchLayer.Show();
         }
         else if (!peripheral.IsRedirecting && _redirectUiActive)
         {
             _redirectUiActive = false;
+            Tray?.SetLive(false);
+            if (AppSettings.Instance.ShowControlIndicator && !_exiting) _indicator?.Show("Back on this PC");
             if (!_exiting && !_redirectWireless) ViewerService.Instance.SetCaptureMode(false);
             _touchLayer?.Close();
             _touchLayer = null;
-            if (_restoreWindowAfterRedirect && !_exiting) ShowMainWindow();
+            // Window order is left exactly as it is: the main window stays behind.
         }
     }
 
-    /// <summary>Ctrl+Alt+Q while capture is off: the keyboard hook handles it while capture is on.</summary>
+    private static void SendToBack(Window window)
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        if (handle != IntPtr.Zero)
+            SetWindowPos(handle, new IntPtr(1) /* HWND_BOTTOM */, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE, NOMOVE, NOACTIVATE */);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
+    /// <summary>The note shown when the phone takes control: whose it is and the quickest way back.</summary>
+    private static string ControlMessage(string target)
+    {
+        var bracket = target.IndexOf(" [", StringComparison.Ordinal);
+        var phone = bracket > 0 ? target[..bracket] : target;
+        var settings = AppSettings.Instance;
+        var back = settings.CtrlAltTapReturns ? "tap Ctrl+Alt" : settings.CaptureHotkeyText;
+        return $"{phone} has the keyboard and mouse  ·  {back} to return";
+    }
+
+    private void OnPictureClicked()
+    {
+        if (!AppSettings.Instance.ClickPictureToControl) return;
+        OnCaptureHotkey();
+    }
+
+    /// <summary>The capture hotkey while capture is off: the keyboard hook handles it while capture is on.</summary>
     private void OnCaptureHotkey()
     {
         var peripheral = PeripheralService.Instance;
@@ -222,9 +274,11 @@ public partial class App : Application
         catch (Exception ex) { Report(ex); }
         Tray?.Dispose();
         _captureHotkey?.Dispose();
+        _indicator?.Close();
+        // The window lets go of the cast's picture before the cast's player is closed.
+        ViewerService.Instance.Stop();
         try { CastService.Instance.Stop(); }
         catch (Exception ex) { Report(ex); }
-        ViewerService.Instance.Stop();
         // A filled window would otherwise be remembered with its title bar off screen.
         try { WirelessDisplay.RestoreIfFilled(); }
         catch (Exception ex) { Report(ex); }
