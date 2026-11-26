@@ -525,11 +525,22 @@ public sealed class PeripheralService : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanCapture));
     }
 
+    // Written at once, on the caller's thread, so lines logged during exit reach the file even
+    // though the page's copy is added later on the UI thread. Each line is flushed as written,
+    // so the file is complete when the process ends.
+    private readonly SessionLog _file = new(AppPaths.InLogs("PhoneDeck-session.log"));
+
     private void Append(string message)
+    {
+        _file.Write($"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}  {message.TrimEnd()}");
+        AppendToPage(message);
+    }
+
+    private void AppendToPage(string message)
     {
         if (!_dispatcher.CheckAccess())
         {
-            _dispatcher.BeginInvoke(() => Append(message));
+            _dispatcher.BeginInvoke(() => AppendToPage(message));
             return;
         }
 

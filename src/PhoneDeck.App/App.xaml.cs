@@ -269,6 +269,7 @@ public partial class App : Application
     {
         if (_exiting) return;
         _exiting = true;
+        PeripheralService.Instance.LogApp("exiting");
         // A failed stop must not strand the app: _exiting is already set, so Exit would never retry.
         try { await PeripheralService.Instance.StopAsync(); }
         catch (Exception ex) { Report(ex); }

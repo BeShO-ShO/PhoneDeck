@@ -18,11 +18,15 @@ public sealed class CastService
 {
     public static CastService Instance { get; } = new();
 
+    private static readonly TimeSpan EndingWait = TimeSpan.FromSeconds(2);
+
     private readonly object _gate = new();
     private Action<string> _log = _ => { };
     private MiracastReceiverSession? _session;
     private MediaPlayer? _player;
     private MiracastReceiverConnection? _connection;
+    // Set while Stop waits for the phone to confirm that the cast it ended is over.
+    private ManualResetEventSlim? _ending;
     private string? _phone;
     private int _generation;
     private bool _starting;
@@ -175,6 +179,7 @@ public sealed class CastService
         MediaPlayer? old;
         lock (_gate)
         {
+            _ending?.Set();
             old = _player;
             _player = null;
             _phone = null;
@@ -212,20 +217,35 @@ public sealed class CastService
         {
             session.ConnectionCreated -= OnConnectionCreated;
             session.MediaSourceCreated -= OnMediaSourceCreated;
-            session.Disconnected -= OnDisconnected;
         }
         // Ends the cast on the phone as its own Disconnect would. Just dropping the session looks
         // to the phone like a lost link, so it cast again at once, and with PhoneDeck gone Windows
         // opened its Wireless Display app to take it.
         if (connection is not null)
         {
+            using var ending = new ManualResetEventSlim(false);
+            lock (_gate) _ending = ending;
             try
             {
                 connection.Disconnect(MiracastReceiverDisconnectReason.DisconnectedByUser);
                 _log("cast: ended the cast on the phone");
+                // The session stays open a moment so the phone gets the message. On a slow PC (the
+                // Surface Go 3) closing straight away left the phone casting again, and Windows
+                // opened its Wireless Display app; waiting fixed it (tested 26 Nov 2026). Windows
+                // usually raises no Disconnected for an end the receiver asked for, so the full
+                // wait is normal. The receiver's events come on its own threads, so waiting here
+                // can't hang them.
+                _log(ending.Wait(EndingWait)
+                    ? "cast: the phone confirmed the end"
+                    : $"cast: gave the phone {EndingWait.TotalSeconds:0} s to end the cast");
             }
             catch (Exception ex) { _log($"cast: ending the cast: {ex.Message}"); }
+            finally
+            {
+                lock (_gate) _ending = null;
+            }
         }
+        if (session is not null) session.Disconnected -= OnDisconnected;
         player?.Dispose();
         try { session?.Dispose(); }
         catch (Exception ex) { _log($"cast: stopping: {ex.Message}"); }
