@@ -89,7 +89,7 @@ To return them to the PC:
 - press the **Copilot key**, on keyboards that have one,
 - touch the screen outside the picture,
 - press **Ctrl+Alt+Q**, or
-- use the bar's stop button.
+- use the bar's **Back to this PC** button.
 
 You can change the hotkey in Settings → Switching between the phone and this PC, and turn each
 of these ways on or off there.
@@ -196,6 +196,9 @@ On top of windows-ble-hid v0.6.0:
   motion spread evenly across reports so Android's acceleration sees a steady speed.
 - **Reliability**: held keys and buttons are released on stop, and the last phone is reselected
   when it reconnects.
+- **Keyboard and mouse only** for DeX on a separate monitor or TV.
+- **Starting DeX from the PC** through a Samsung routine, by briefly opening the phone's
+  Bluetooth Audio, which routines notice and a keyboard doesn't.
 - **Compact window** with Home, Details and Settings.
 
 ## Building
@@ -227,7 +230,10 @@ zips to a GitHub release.
   Logs says why). If it still fails, switch to mpv.
 - **The phone can't find the PC to cast to, or the cast fails**: check that Home says it is
   ready, that the Wireless Display app is closed, and that PhoneDeck is allowed through the
-  firewall. If it still fails, use the Wireless Display app (Settings → Receive Wireless with).
+  firewall. If it still fails, use the Wireless Display app (Settings → Wireless → Receive the cast with).
+- **A phone routine doesn't start DeX**: the phone must be unlocked, and the switch in Settings →
+  Advanced must be on with Wireless chosen. Details → Logs shows a "routine:" line each time
+  PhoneDeck opens the phone's Audio, or why it couldn't.
 
 ## Known limitations
 
@@ -235,6 +241,7 @@ zips to a GitHub release.
 - With the Wireless Display app, the Windows pointer can stay visible over the picture until the screen
   is touched.
 - After PhoneDeck restarts, the phone usually needs a **Connect** tap to reconnect.
+- Starting DeX through a phone routine only works while the phone is unlocked.
 - Builds are unsigned, so Windows SmartScreen may warn on first run.
 
 ## License and trademarks
