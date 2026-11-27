@@ -1,6 +1,10 @@
 using System.Collections.Specialized;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 using PhoneDeck.App.Services;
+using PhoneDeck.Core;
 
 namespace PhoneDeck.App.Views;
 
@@ -15,21 +19,59 @@ public partial class StatusPage : Page
         _service.Log.CollectionChanged += OnLogChanged;
         Unloaded += (_, _) => _service.Log.CollectionChanged -= OnLogChanged;
         // On Loaded rather than here: pages are kept, and the settings can change in between.
-        Loaded += (_, _) => ShowSwitchKeys();
+        Loaded += (_, _) =>
+        {
+            ShowShortcuts();
+            LogActionStatus.Visibility = Visibility.Collapsed;
+        };
     }
 
-    /// <summary>Lists only the target-switch keys that are turned on, and hides the card if none are.</summary>
-    private void ShowSwitchKeys()
+    private void ShowShortcuts()
     {
-        var caps = AppSettings.Instance.EnableCapsLockSwitch;
-        var chord = AppSettings.Instance.EnableCtrlDCSwitch;
-        static System.Windows.Visibility Show(bool on) =>
-            on ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+        var settings = AppSettings.Instance;
+        ShortcutItems.ItemsSource = ShortcutList.Build(settings.CaptureHotkeyText,
+            settings.ClickPictureToControl, settings.CtrlAltTapReturns, settings.CopilotKeyReturns,
+            settings.TouchOutsideReturns, settings.UseBuiltInViewer,
+            DisplayRoutes.ShowsPicture(settings.DisplayRoute));
+    }
 
-        SwitchCard.Visibility = Show(caps || chord);
-        CapsHint.Visibility = Show(caps);
-        ChordHint.Visibility = Show(chord);
-        ChordHint.Text = caps ? "or Ctrl + D + C" : "Ctrl + D + C";
+    private void OnCopyLog(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(string.Join(Environment.NewLine, _service.Log));
+            ShowLogAction("Copied. It includes your phone's name and Bluetooth address, so check it before sharing.");
+        }
+        // The clipboard can be held by another app for a moment.
+        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            ShowLogAction("The clipboard is busy; try again.");
+        }
+    }
+
+    private void OnOpenLog(object sender, RoutedEventArgs e)
+    {
+        var path = _service.LogFilePath;
+        if (!File.Exists(path))
+        {
+            ShowLogAction("There is no log file yet.");
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            ShowLogAction($"Couldn't open it: {ex.Message}. It is at {path}");
+        }
+    }
+
+    private void ShowLogAction(string text)
+    {
+        LogActionStatus.Text = text;
+        LogActionStatus.Visibility = Visibility.Visible;
     }
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -41,9 +83,9 @@ public partial class StatusPage : Page
     private void OnBoundaryFeedback(object? sender, System.Windows.Input.ManipulationBoundaryFeedbackEventArgs e) =>
         e.Handled = true;
 
-    private async void OnStart(object sender, System.Windows.RoutedEventArgs e) =>
+    private async void OnStart(object sender, RoutedEventArgs e) =>
         await _service.StartAsync();
 
-    private async void OnStop(object sender, System.Windows.RoutedEventArgs e) =>
+    private async void OnStop(object sender, RoutedEventArgs e) =>
         await _service.StopAsync();
 }

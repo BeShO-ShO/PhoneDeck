@@ -27,6 +27,10 @@ public sealed class CastService
     private MiracastReceiverConnection? _connection;
     // Set while Stop waits for the phone to confirm that the cast it ended is over.
     private ManualResetEventSlim? _ending;
+    // When the phone last dropped the cast by itself (Environment.TickCount64), 0 for not since.
+    private long _droppedAt;
+    // The latest stop, which may still be catching the phone's retries.
+    private Task _stopping = Task.CompletedTask;
     private string? _phone;
     private int _generation;
     private bool _starting;
@@ -62,12 +66,19 @@ public sealed class CastService
         // there, so the cast's player was created on it, and the viewer window drawing that player
         // and the UI thread then waited on each other until both hung. On the thread pool the
         // session and its player stay on background threads, as they did in testing.
+        // Stopping runs in the background too: after ending a cast it keeps listening for the
+        // phone's retries for up to half a minute.
         if (AppSettings.Instance.DisplayRoute == DisplayRoute.Cast) _ = Task.Run(StartAsync);
-        else Stop();
+        else _ = StopInBackground(afterDropToo: false);
     }
 
     private async Task StartAsync()
     {
+        // A receiver still catching the phone's retries is closed first: two at once don't mix.
+        Task stopping;
+        lock (_gate) stopping = _stopping;
+        await stopping;
+
         int generation;
         lock (_gate)
         {
@@ -137,6 +148,7 @@ public sealed class CastService
         {
             _phone = name;
             _connection = args.Connection;
+            _droppedAt = 0;
         }
         _log($"cast: {name} connected");
     }
@@ -179,6 +191,8 @@ public sealed class CastService
         MediaPlayer? old;
         lock (_gate)
         {
+            // Not an end PhoneDeck asked for: the phone dropped the cast and may try again.
+            if (_ending is null) _droppedAt = Environment.TickCount64;
             _ending?.Set();
             old = _player;
             _player = null;
@@ -194,12 +208,42 @@ public sealed class CastService
         SetStatus(new CastStatus(CastState.Waiting));
     }
 
+    /// <summary>
+    /// On exit: stops off the UI thread, since catching the phone's retries can take up to
+    /// <see cref="CastRetryWindow.MaxListen"/>.
+    /// </summary>
+    public Task StopForExitAsync() => StopInBackground(afterDropToo: true);
+
+    /// <summary>
+    /// Runs <see cref="Stop"/> on the thread pool and remembers it, so a receiver started again
+    /// meanwhile waits until this one has finished catching retries.
+    /// </summary>
+    private Task StopInBackground(bool afterDropToo)
+    {
+        Task task;
+        lock (_gate)
+        {
+            var previous = _stopping;
+            task = _stopping = Task.Run(async () =>
+            {
+                await previous;
+                Stop(afterDropToo);
+            });
+        }
+        return task;
+    }
+
     /// <summary>Stops listening and ends any cast.</summary>
-    public void Stop()
+    /// <param name="afterDropToo">
+    /// Also keep listening if there was no cast to end but the phone dropped one shortly before
+    /// (on exit): it may still be retrying.
+    /// </param>
+    private void Stop(bool afterDropToo)
     {
         MiracastReceiverSession? session;
         MediaPlayer? player;
         MiracastReceiverConnection? connection;
+        long droppedAt;
         lock (_gate)
         {
             _generation++;
@@ -210,6 +254,8 @@ public sealed class CastService
             connection = _connection;
             _connection = null;
             _phone = null;
+            droppedAt = _droppedAt;
+            _droppedAt = 0;
         }
 
         if (session is null && player is null && Status.State == CastState.Off) return;
@@ -218,9 +264,11 @@ public sealed class CastService
             session.ConnectionCreated -= OnConnectionCreated;
             session.MediaSourceCreated -= OnMediaSourceCreated;
         }
+
         // Ends the cast on the phone as its own Disconnect would. Just dropping the session looks
         // to the phone like a lost link, so it cast again at once, and with PhoneDeck gone Windows
         // opened its Wireless Display app to take it.
+        var ended = false;
         if (connection is not null)
         {
             using var ending = new ManualResetEventSlim(false);
@@ -228,6 +276,7 @@ public sealed class CastService
             try
             {
                 connection.Disconnect(MiracastReceiverDisconnectReason.DisconnectedByUser);
+                ended = true;
                 _log("cast: ended the cast on the phone");
                 // The session stays open a moment so the phone gets the message. On a slow PC (the
                 // Surface Go 3) closing straight away left the phone casting again, and Windows
@@ -246,11 +295,86 @@ public sealed class CastService
             }
         }
         if (session is not null) session.Disconnected -= OnDisconnected;
+
+        var guard = session is not null && (ended
+            || (afterDropToo && CastRetryWindow.ShouldListen(droppedAt, Environment.TickCount64)));
+
         player?.Dispose();
         try { session?.Dispose(); }
         catch (Exception ex) { _log($"cast: stopping: {ex.Message}"); }
         if (session is not null) _log("cast: stopped receiving");
         SetStatus(new CastStatus(CastState.Off));
+
+        // The 2 s alone wasn't enough on the Surface Pro (26 Nov 2026): the phone cast again about
+        // 4 s after being told to stop, and Windows sent that to its Wireless Display app. So a
+        // Wireless Display that starts meanwhile is closed. (A fresh receiver to refuse the retry
+        // was tried too, but Windows never let one start this soon: 0 of 7 exits, 27 Nov 2026.)
+        if (guard) GuardAgainstRetries(ended ? null : droppedAt);
+    }
+
+    /// <summary>
+    /// For a while after a cast ends, a Wireless Display app that starts is closed. Ends once
+    /// nothing has started for <see cref="CastRetryWindow.Quiet"/> (at most
+    /// <see cref="CastRetryWindow.MaxListen"/>). Runs on the thread pool; nothing is shown.
+    /// </summary>
+    /// <param name="droppedAt">When the phone dropped the cast, if that is why; null after ending one.</param>
+    private void GuardAgainstRetries(long? droppedAt)
+    {
+        _log(droppedAt is { } dropped
+            ? $"cast: the phone dropped the cast {(Environment.TickCount64 - dropped) / 1000} s ago; " +
+              "watching in case it tries again"
+            : "cast: watching in case the phone tries again");
+
+        var startedAt = Environment.TickCount64;
+        var watchFrom = DateTime.Now.AddSeconds(-1);
+        // Only a Wireless Display that starts from now on is closed, never one already open.
+        var alreadyOpen = Process.GetProcessesByName("Receiver").Select(p => p.Id).ToHashSet();
+        long lastRetryAt = 0;
+        var closed = 0;
+
+        int wait;
+        while ((wait = CastRetryWindow.RemainingMs(startedAt, lastRetryAt, Environment.TickCount64)) > 0)
+        {
+            if (CloseNewWirelessDisplay(alreadyOpen, watchFrom))
+            {
+                closed++;
+                // Counts as the phone trying again, so watching goes on a while longer.
+                lastRetryAt = Environment.TickCount64;
+            }
+            Thread.Sleep(Math.Min(wait, 500));
+        }
+
+        _log(closed == 0
+            ? "cast: the phone didn't try again"
+            : $"cast: done watching (closed Wireless Display {closed} time(s))");
+    }
+
+    /// <summary>
+    /// Closes a Wireless Display app that started after <paramref name="since"/> and wasn't open
+    /// before. Nothing is casting to it: PhoneDeck has just ended the cast.
+    /// </summary>
+    private bool CloseNewWirelessDisplay(HashSet<int> alreadyOpen, DateTime since)
+    {
+        var any = false;
+        foreach (var process in Process.GetProcessesByName("Receiver"))
+        {
+            using (process)
+            {
+                try
+                {
+                    if (alreadyOpen.Contains(process.Id) || process.StartTime < since) continue;
+                    process.Kill();
+                    alreadyOpen.Add(process.Id);
+                    any = true;
+                    _log("cast: Windows opened Wireless Display for the phone's retry; closed it");
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // Gone already, or not ours to read.
+                }
+            }
+        }
+        return any;
     }
 
     private void SetStatus(CastStatus status)

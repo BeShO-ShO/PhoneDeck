@@ -13,14 +13,15 @@
     <conv:InverseBoolConverter x:Key="InverseBool" />
   </Page.Resources>
 
-  <!-- Everything needed every time, top to bottom: is the phone there, start, where input goes,
-       touch. Logs, encryption and pacing live on the Details page. -->
+  <!-- Everything needed every time, top to bottom: is the phone there, start, how the screen is
+       shown and whether that is ready, sound and touch. Logs, encryption and pacing live on the
+       Details page. -->
   <StackPanel Margin="16,4,16,16">
 
     <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,12"
                 Title="Bluetooth is off"
                 Message="Start it from the Details page."
-                IsOpen="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
+                IsOpen="{Binding ShowBluetoothOff}" />
 
     <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
@@ -72,40 +73,52 @@
       </StackPanel>
     </ui:Button>
 
-    <ui:InfoBar Severity="Informational" IsClosable="False" Margin="0,0,0,12"
-                Title="Input is staying on this PC"
-                Message="Capture is on, but This PC is selected. Choose your phone below."
-                IsOpen="{Binding IsCapturingLocally}" />
-
     <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,12"
                 Title="Lock keys on the phone"
                 Message="{Binding TargetLockWarning, Mode=OneWay}"
                 IsOpen="{Binding HasTargetLockWarning, Mode=OneWay}" />
 
-    <ui:TextBlock Text="Send input to" FontTypography="BodyStrong" Margin="0,0,0,8" />
-    <ItemsControl ItemsSource="{Binding Targets}" Margin="0,0,0,12">
-      <ItemsControl.ItemsPanel>
-        <ItemsPanelTemplate>
-          <WrapPanel />
-        </ItemsPanelTemplate>
-      </ItemsControl.ItemsPanel>
-      <ItemsControl.ItemTemplate>
-        <DataTemplate>
-          <RadioButton GroupName="InputTarget" Content="{Binding Title}" Margin="0,0,24,8"
-                       IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                       Checked="OnTargetChecked" />
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
+    <!-- Only with two or more phones connected: with one, it always gets the input. -->
+    <StackPanel Visibility="{Binding HasPhoneChoice, Converter={StaticResource BoolToVisibility}}">
+      <ui:TextBlock Text="Send input to" FontTypography="BodyStrong" Margin="0,0,0,8" />
+      <ItemsControl ItemsSource="{Binding Targets}" Margin="0,0,0,12">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <RadioButton GroupName="InputTarget" Content="{Binding Title}" Margin="0,0,24,8"
+                         IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                         Checked="OnTargetChecked" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
 
     <!-- How the phone's screen is shown, and below it only the options that apply to that way. -->
     <ui:TextBlock Text="Show the phone's screen with" FontTypography="BodyStrong" Margin="0,4,0,8" />
     <WrapPanel Margin="0,0,0,8">
       <RadioButton GroupName="HomeDisplayRoute" Content="Capture device" Margin="0,0,24,4"
                    IsChecked="{Binding RouteIsCaptureDevice, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
-      <RadioButton GroupName="HomeDisplayRoute" Content="Wireless" Margin="0,0,0,4"
+      <RadioButton GroupName="HomeDisplayRoute" Content="Wireless" Margin="0,0,24,4"
                    IsChecked="{Binding RouteIsWireless, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+      <RadioButton GroupName="HomeDisplayRoute" Content="Keyboard and mouse only" Margin="0,0,0,4"
+                   IsChecked="{Binding RouteIsKeyboardOnly, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
     </WrapPanel>
+
+    <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,8"
+                    Visibility="{Binding RouteIsKeyboardOnly, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="No picture on this PC" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="PhoneDeck is only the phone's Bluetooth keyboard and mouse, for DeX on a separate monitor or TV." />
+        </StackPanel>
+      </ui:CardControl.Header>
+    </ui:CardControl>
 
     <!-- PhoneDeck's own receiver: its state, so "is it ready?" needs no guessing. -->
     <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,8"
@@ -119,44 +132,52 @@
       </ui:CardControl.Header>
     </ui:CardControl>
 
-    <StackPanel Visibility="{Binding RouteIsWirelessDisplayApp, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource InverseBoolToVisibility}}">
-      <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8"
-                      Visibility="{Binding RouteIsCaptureDevice, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
-        <ui:CardControl.Header>
-          <StackPanel>
-            <ui:TextBlock Text="Open the phone's screen" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Opens it when capture starts. Viewer and device in Settings." />
-          </StackPanel>
-        </ui:CardControl.Header>
-        <ui:ToggleSwitch IsChecked="{Binding OpenViewerWithCapture, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
-      </ui:CardControl>
+    <!-- The capture device at a glance: chosen, plugged in, or missing. -->
+    <ui:CardControl Icon="{ui:SymbolIcon Video24}" Margin="0,0,0,8"
+                    Visibility="{Binding RouteIsCaptureDevice, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Capture device" FontTypography="BodyStrong" />
+          <ui:TextBlock x:Name="DeviceStatusText" FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+      </ui:CardControl.Header>
+    </ui:CardControl>
 
-      <ui:CardControl Icon="{ui:SymbolIcon Speaker224}" Margin="0,0,0,8">
+    <!-- Sound and touch side by side, short: the details are in the tooltips. -->
+    <Grid Visibility="{Binding RouteHasSoundAndTouch, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="8" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <ui:CardControl Grid.Column="0" Icon="{ui:SymbolIcon Speaker224}"
+                      ToolTip="From the capture device or the cast. Off can mean less delay with a capture device.">
         <ui:CardControl.Header>
           <StackPanel>
-            <ui:TextBlock Text="Play the phone's sound" FontTypography="BodyStrong" />
+            <ui:TextBlock Text="Sound" FontTypography="BodyStrong" />
             <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="From the capture device or the cast. Off can mean less delay with a capture device." />
+                          Text="Off can mean less delay" />
           </StackPanel>
         </ui:CardControl.Header>
         <ui:ToggleSwitch IsChecked="{Binding ViewerSound, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
       </ui:CardControl>
 
-      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}">
+      <ui:CardControl Grid.Column="2" Icon="{ui:SymbolIcon Cursor24}"
+                      ToolTip="Touch and pen on the picture go to the phone, with a button bar below it.">
         <ui:CardControl.Header>
           <StackPanel>
-            <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
+            <ui:TextBlock Text="Touchscreen" FontTypography="BodyStrong" />
             <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Touch and pen on the video go to the phone, with a button bar below it." />
+                          Text="Touch and pen" />
           </StackPanel>
         </ui:CardControl.Header>
         <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
       </ui:CardControl>
-    </StackPanel>
+    </Grid>
 
     <ui:CardControl Icon="{ui:SymbolIcon Cast24}"
                     Visibility="{Binding RouteIsWirelessDisplayApp, Source={x:Static services:AppSettings.Instance}, Converter={StaticResource BoolToVisibility}}">

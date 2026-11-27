@@ -12,57 +12,34 @@
     <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
   </Page.Resources>
 
+  <!-- Grouped under headings. Sound and touch are only on Home, so they aren't repeated here. -->
   <StackPanel Margin="16,4,16,16">
-    <ui:TextBlock Text="Control how PhoneDeck starts and what happens when the window is closed."
-                  FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                  TextWrapping="Wrap" Margin="0,0,0,20" />
 
     <ui:InfoBar x:Name="DevBar" Severity="Informational" IsClosable="False" Margin="0,0,0,16"
                 Title="Auto-start unavailable"
                 Message="Run the published executable rather than 'dotnet run' to register auto-start." />
 
-    <ui:CardControl Icon="{ui:SymbolIcon Power24}" Margin="0,0,0,8">
+    <!-- Starting -->
+    <ui:TextBlock Text="Starting" FontTypography="Subtitle" Margin="0,0,0,8" />
+    <ui:CardControl Icon="{ui:SymbolIcon Power24}" Margin="0,0,0,20">
       <ui:CardControl.Header>
         <StackPanel>
           <ui:TextBlock Text="Start with Windows" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Launches hidden in the notification area when you sign in." />
+                        Text="Starts hidden in the notification area when you sign in." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:ToggleSwitch x:Name="AutoStartToggle" Click="OnAutoStartChanged" />
     </ui:CardControl>
 
-    <ui:CardControl Icon="{ui:SymbolIcon Play24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Start the peripheral automatically" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Begins advertising as soon as the app launches." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding StartPeripheralOnLaunch, Mode=TwoWay}" />
-    </ui:CardControl>
-
-    <ui:CardControl Icon="{ui:SymbolIcon ArrowMinimize24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Keep running when the window is closed" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Paired hosts reconnect to a peripheral that never restarted, so staying resident keeps them working." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
-    </ui:CardControl>
-
-    <ui:Card Margin="0,0,0,8" Padding="16,12,16,16">
+    <!-- Switching -->
+    <ui:TextBlock Text="Switching between the phone and this PC" FontTypography="Subtitle" Margin="0,0,0,8" />
+    <ui:Card Margin="0,0,0,20" Padding="16,12,16,16">
       <StackPanel>
-        <ui:TextBlock Text="Switching between the phone and this PC" FontTypography="BodyStrong" />
-        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,2,0,12"
+        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,12"
                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                      Text="How the keyboard and mouse go to the phone and come back. Changes apply the next time capture starts." />
+                      Text="How the keyboard and mouse go to the phone and come back. Changes apply the next time the phone takes control." />
 
         <ui:TextBlock Text="Hotkey that turns it on and off (click the box, then press the new keys)" FontTypography="Caption" Margin="0,0,0,4" />
         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
@@ -90,77 +67,13 @@
       </StackPanel>
     </ui:Card>
 
-    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Shake the pointer to switch target" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Move the mouse rapidly back and forth to cycle between this PC and the paired hosts. Ctrl+Alt+CapsLock always works too." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch x:Name="SwitchGestureToggle" Click="OnSwitchGestureChanged" />
-    </ui:CardControl>
-
-    <ui:CardControl Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Switch target with Ctrl+Alt+CapsLock" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Cycles between this PC and each paired device while capture stays on. Only useful with more than one device: with one phone, the hotkey above already switches. Applies the next time capture starts." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding EnableCapsLockSwitch, Mode=TwoWay}" />
-    </ui:CardControl>
-
-    <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Also switch target with Ctrl+D+C" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Can send a stray D or C to the device you are controlling. Ctrl+Alt+CapsLock always works. Applies the next time capture starts." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding EnableCtrlDCSwitch, Mode=TwoWay}" />
-    </ui:CardControl>
-
-    <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Receive Wireless with" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Used when Wireless is chosen on Home. PhoneDeck: cast DeX to this PC and PhoneDeck shows it in its own window, with the keyboard, mouse, touch and pen; Windows asks once to let PhoneDeck through the firewall. Wireless Display app: the backup, if PhoneDeck can't receive the cast on this PC." />
-        </StackPanel>
-      </ui:CardControl.Header>
+    <!-- Capture device -->
+    <ui:TextBlock Text="Capture device" FontTypography="Subtitle" Margin="0,0,0,8" />
+    <ui:Card Margin="0,0,0,20" Padding="16,12,16,16">
       <StackPanel>
-        <RadioButton GroupName="SettingsWirelessReceiver" Content="PhoneDeck" Margin="0,0,0,4"
-                     IsChecked="{Binding WirelessIsPhoneDeck, Mode=TwoWay}" />
-        <RadioButton GroupName="SettingsWirelessReceiver" Content="Wireless Display app"
-                     IsChecked="{Binding WirelessIsApp, Mode=TwoWay}" />
-      </StackPanel>
-    </ui:CardControl>
-
-    <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
-      <ui:CardControl.Header>
-        <StackPanel>
-          <ui:TextBlock Text="Use the touchscreen" FontTypography="BodyStrong" />
-          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Touch and pen on the video go to the phone, with a button bar below it. Same switch as on Home." />
-        </StackPanel>
-      </ui:CardControl.Header>
-      <ui:ToggleSwitch IsChecked="{Binding TouchLayerEnabled, Mode=TwoWay}" />
-    </ui:CardControl>
-
-    <ui:Card Margin="0,0,0,8" Padding="16,12,16,16">
-      <StackPanel>
-        <ui:TextBlock Text="Phone's screen (capture device)" FontTypography="BodyStrong" />
-        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,2,0,12"
+        <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,12"
                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                      Text="Opened with capture when the switch on Home is on. Changes apply the next time it opens." />
+                      Text="Opens when the phone takes control. For DeX on a separate monitor, choose Keyboard and mouse only on Home instead. Changes apply the next time it opens." />
 
         <ui:TextBlock Text="Show it in" FontTypography="Caption" Margin="0,0,0,4" />
         <RadioButton GroupName="SettingsViewer" Content="PhoneDeck's viewer (built in, no mpv needed)" Margin="0,0,0,4"
@@ -173,22 +86,20 @@
                   Text="{Binding ViewerVideoDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
 
         <ui:TextBlock Text="Sound device (leave empty to use the capture device's own)" FontTypography="Caption" Margin="0,0,0,4" />
-        <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,6"
+        <ComboBox x:Name="AudioDeviceBox" IsEditable="True" Margin="0,0,0,10"
                   Text="{Binding ViewerAudioDevice, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
-        <CheckBox Content="Play the sound (off can mean less delay)" Margin="0,0,0,10"
-                  IsChecked="{Binding ViewerSound, Mode=TwoWay}" />
 
         <StackPanel Visibility="{Binding UseBuiltInViewer, Converter={StaticResource InverseBoolToVisibility}}">
           <ui:TextBlock Text="mpv.exe" FontTypography="Caption" Margin="0,0,0,4" />
-          <ui:TextBox x:Name="MpvPathBox" Margin="0,0,0,10"
+          <ui:TextBox x:Name="MpvPathBox"
                       Text="{Binding MpvPath, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
         </StackPanel>
 
-        <StackPanel Visibility="{Binding UseBuiltInViewer, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,10">
+        <StackPanel Visibility="{Binding UseBuiltInViewer, Converter={StaticResource BoolToVisibility}}">
           <ui:TextBlock Text="Picture" FontTypography="BodyStrong" Margin="0,4,0,2" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,8"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Black and white levels. If colours look too strong, with crushed blacks, try Full. If the picture looks washed out with grey blacks, try Limited. Shows at once, with no added delay." />
+                        Text="Black and white levels. Colours too strong, with crushed blacks: try Full. Washed out with grey blacks: try Limited. Shows at once." />
 
           <ComboBox SelectedIndex="{Binding ViewerRange, Mode=TwoWay}">
             <ComboBoxItem Content="Automatic" />
@@ -196,14 +107,77 @@
             <ComboBoxItem Content="Limited (16 to 235)" />
           </ComboBox>
         </StackPanel>
-
-        <StackPanel Orientation="Horizontal">
-          <ui:Button Content="Open now" Click="OnOpenViewer" />
-          <ui:TextBlock x:Name="ViewerStatus" FontTypography="Caption" VerticalAlignment="Center" Margin="12,0,0,0"
-                        TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
       </StackPanel>
     </ui:Card>
+
+    <!-- Wireless -->
+    <ui:TextBlock Text="Wireless" FontTypography="Subtitle" Margin="0,0,0,8" />
+    <ui:CardControl Icon="{ui:SymbolIcon Cast24}" Margin="0,0,0,20">
+      <ui:CardControl.Header>
+        <StackPanel>
+          <ui:TextBlock Text="Receive the cast with" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="PhoneDeck shows the cast in its own window; Windows asks once to let it through the firewall. The Wireless Display app is the backup, if PhoneDeck can't receive the cast on this PC." />
+        </StackPanel>
+      </ui:CardControl.Header>
+      <StackPanel>
+        <RadioButton GroupName="SettingsWirelessReceiver" Content="PhoneDeck" Margin="0,0,0,4"
+                     IsChecked="{Binding WirelessIsPhoneDeck, Mode=TwoWay}" />
+        <RadioButton GroupName="SettingsWirelessReceiver" Content="Wireless Display app"
+                     IsChecked="{Binding WirelessIsApp, Mode=TwoWay}" />
+      </StackPanel>
+    </ui:CardControl>
+
+    <!-- Advanced: turning these off mostly breaks things. -->
+    <ui:CardExpander Icon="{ui:SymbolIcon Wrench24}" Header="Advanced" Margin="0,0,0,20">
+      <StackPanel>
+        <Grid Margin="0,0,0,12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <ui:TextBlock Text="Start the phone's routine when it connects" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="With Wireless chosen, opens the phone's Bluetooth Audio for 3 s when it connects, so a routine on the phone can start DeX and cast. Choosing Wireless reconnects the phone to do this. The phone must be unlocked, and casting needs the routine's touch macro." />
+          </StackPanel>
+          <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                           IsChecked="{Binding TriggerPhoneRoutine, Mode=TwoWay}" />
+        </Grid>
+
+        <Grid Margin="0,0,0,12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <ui:TextBlock Text="Start Bluetooth when PhoneDeck opens" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Leave on. Off means pressing Start on the Details page before the phone can connect." />
+          </StackPanel>
+          <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                           IsChecked="{Binding StartPeripheralOnLaunch, Mode=TwoWay}" />
+        </Grid>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <ui:TextBlock Text="Keep running when the window is closed" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                          Text="Leave on. Closing PhoneDeck ends the Bluetooth connection, and the phone has to reconnect." />
+          </StackPanel>
+          <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                           IsChecked="{Binding CloseToTray, Mode=TwoWay}" />
+        </Grid>
+      </StackPanel>
+    </ui:CardExpander>
 
     <ui:CardControl Icon="{ui:SymbolIcon ArrowExit20}">
       <ui:CardControl.Header>
@@ -211,7 +185,7 @@
           <ui:TextBlock Text="Exit PhoneDeck" FontTypography="BodyStrong" />
           <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                         Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                        Text="Stops advertising and removes the tray icon. Hosts will need to reconnect." />
+                        Text="Ends the Bluetooth connection and removes the tray icon. The phone will need to reconnect." />
         </StackPanel>
       </ui:CardControl.Header>
       <ui:Button Content="Exit" Click="OnExit" />

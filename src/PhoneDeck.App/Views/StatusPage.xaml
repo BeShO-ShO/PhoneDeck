@@ -17,17 +17,13 @@
        scroller swallows the wheel without being able to scroll. -->
   <StackPanel Margin="16,4,16,16">
 
-      <ui:TextBlock Text="The Bluetooth service, connection details, pointer pacing, shortcuts, and logs."
-                    FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                    TextWrapping="Wrap" Margin="0,0,0,20" />
-
       <ui:InfoBar Severity="Warning" IsClosable="False" Margin="0,0,0,16"
-                  Title="Not advertising"
-                  Message="Start the peripheral to make this PC discoverable as a Bluetooth keyboard."
+                  Title="Bluetooth is off"
+                  Message="Press Start below so the phone can connect to this PC."
                   IsOpen="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
 
       <ui:InfoBar Severity="Informational" IsClosable="False" Margin="0,0,0,16"
-                  Title="No device connected"
+                  Title="No phone connected"
                   Message="On your phone, open Bluetooth settings, tap the gear next to this PC, and tap Connect. If it has never been paired, pair it from there first."
                   IsOpen="{Binding NeedsReconnect}" />
 
@@ -38,13 +34,13 @@
         <ui:TextBlock Text="{Binding ConnectionText}" FontTypography="Body" TextWrapping="Wrap" />
       </ui:CardControl>
 
-      <ui:CardControl Icon="{ui:SymbolIcon Bluetooth24}" Margin="0,0,0,8">
+      <ui:CardControl Icon="{ui:SymbolIcon Bluetooth24}" Margin="0,0,0,20">
         <ui:CardControl.Header>
           <StackPanel>
-            <ui:TextBlock Text="PhoneDeck peripheral" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption"
+            <ui:TextBlock Text="Bluetooth keyboard and mouse" FontTypography="BodyStrong" />
+            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="{Binding AdvertisementStatus, StringFormat='Advertisement: {0}'}" />
+                          Text="What the phone connects to. Stop only to troubleshoot: the phone has to reconnect." />
           </StackPanel>
         </ui:CardControl.Header>
 
@@ -58,100 +54,47 @@
         </StackPanel>
       </ui:CardControl>
 
-      <ui:CardControl Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,0,8">
-        <ui:CardControl.Header>
-          <StackPanel>
-            <ui:TextBlock Text="Require encryption" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption"
-                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Hosts must bond before they can read reports. Can only be changed while stopped." />
-          </StackPanel>
-        </ui:CardControl.Header>
-        <ui:ToggleSwitch IsChecked="{Binding RequireEncryption, Mode=TwoWay}"
-                         IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
-      </ui:CardControl>
-
-      <Grid Margin="0,0,0,20">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="8" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <ui:CardControl Grid.Column="0" Icon="{ui:SymbolIcon Keyboard24}">
-          <ui:CardControl.Header>
-            <ui:TextBlock Text="Keyboard subscribers" FontTypography="BodyStrong" />
-          </ui:CardControl.Header>
-          <ui:TextBlock Text="{Binding KeyboardSubscribers}" FontTypography="TitleLarge" />
-        </ui:CardControl>
-
-        <ui:CardControl Grid.Column="2" Icon="{ui:SymbolIcon Cursor24}">
-          <ui:CardControl.Header>
-            <ui:TextBlock Text="Mouse subscribers" FontTypography="BodyStrong" />
-          </ui:CardControl.Header>
-          <ui:TextBlock Text="{Binding MouseSubscribers}" FontTypography="TitleLarge" />
-        </ui:CardControl>
-      </Grid>
-
-      <ui:TextBlock Text="Pointer" FontTypography="Subtitle" Margin="0,0,0,8" />
-
-      <ui:CardControl Icon="{ui:SymbolIcon Cursor24}" Margin="0,0,0,8">
-        <ui:CardControl.Header>
-          <StackPanel>
-            <ui:TextBlock Text="Even pointer pacing" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="Spreads movement evenly so the phone's pointer moves smoothly. Off sends it in bursts. Takes effect at once." />
-          </StackPanel>
-        </ui:CardControl.Header>
-        <ui:ToggleSwitch IsChecked="{Binding EvenPointerPacing, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
-      </ui:CardControl>
-
-      <ui:CardControl Icon="{ui:SymbolIcon Timer24}" Margin="0,0,0,20">
-        <ui:CardControl.Header>
-          <StackPanel>
-            <ui:TextBlock Text="Minimum pointer interval" FontTypography="BodyStrong" />
-            <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
-                          Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                          Text="{Binding LinkIntervalMs, StringFormat='Paced to {0} ms right now — whichever is slower of this minimum and the connection interval the phone negotiated.'}" />
-          </StackPanel>
-        </ui:CardControl.Header>
-        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <Slider Width="160" Minimum="5" Maximum="50" TickFrequency="5" IsSnapToTickEnabled="True"
-                  VerticalAlignment="Center"
-                  Value="{Binding PointerIntervalMs, Mode=TwoWay}" />
-          <ui:TextBlock Width="52" Margin="12,0,0,0" VerticalAlignment="Center"
-                        Text="{Binding PointerIntervalMs, StringFormat='{}{0} ms'}" />
-        </StackPanel>
-      </ui:CardControl>
-
+      <!-- Built from the current settings each time the page shows. -->
       <ui:TextBlock Text="Shortcuts" FontTypography="Subtitle" Margin="0,0,0,8" />
-
-      <ui:CardControl x:Name="SwitchCard" Icon="{ui:SymbolIcon ArrowSwap24}" Margin="0,0,0,8">
-        <ui:CardControl.Header>
-          <ui:TextBlock Text="Switch to the next target" FontTypography="BodyStrong" />
-        </ui:CardControl.Header>
-        <StackPanel MaxWidth="240">
-          <ui:TextBlock x:Name="CapsHint" Text="Ctrl + Alt + CapsLock" FontFamily="Cascadia Mono, Consolas"
-                        FontTypography="Body" TextWrapping="Wrap" />
-          <ui:TextBlock x:Name="ChordHint" Text="or Ctrl + D + C" FontFamily="Cascadia Mono, Consolas"
-                        FontTypography="Body" TextWrapping="Wrap" Margin="0,4,0,0"
-                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-        </StackPanel>
-      </ui:CardControl>
-
-      <ui:CardControl Icon="{ui:SymbolIcon Keyboard24}" Margin="0,0,0,20">
-        <ui:CardControl.Header>
-          <ui:TextBlock Text="Turn capture on or off" FontTypography="BodyStrong" />
-        </ui:CardControl.Header>
-        <ui:TextBlock Text="Ctrl + Alt + Q" FontFamily="Cascadia Mono, Consolas"
-                      FontTypography="Body" />
-      </ui:CardControl>
-
-      <ui:TextBlock Text="Logs" FontTypography="Subtitle" Margin="0,0,0,8" />
       <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
               BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-              BorderThickness="1" CornerRadius="8" Height="220">
+              BorderThickness="1" CornerRadius="8" Padding="16,12" Margin="0,0,0,20">
+        <ItemsControl x:Name="ShortcutItems">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="0,4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="12" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding Keys}" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <TextBlock Grid.Column="2" Text="{Binding Does}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+
+      <Grid Margin="0,0,0,8">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <ui:TextBlock Text="Logs" FontTypography="Subtitle" VerticalAlignment="Center" />
+        <ui:Button Grid.Column="1" Content="Copy" Margin="0,0,8,0" Click="OnCopyLog"
+                   ToolTip="Copy the log to the clipboard" />
+        <ui:Button Grid.Column="2" Content="Open log file" Click="OnOpenLog"
+                   ToolTip="The same log, kept on disk with the run before it" />
+      </Grid>
+      <ui:TextBlock x:Name="LogActionStatus" FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,6"
+                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+      <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+              BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+              BorderThickness="1" CornerRadius="8" Height="220" Margin="0,0,0,20">
         <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Padding="12"
                       PanningMode="VerticalOnly"
                       ManipulationBoundaryFeedback="OnBoundaryFeedback">
@@ -166,6 +109,64 @@
           </ItemsControl>
         </ScrollViewer>
       </Border>
+
+      <!-- Rarely needed, and some of it breaks the connection if changed. -->
+      <ui:CardExpander Icon="{ui:SymbolIcon Wrench24}" Header="Advanced">
+        <StackPanel>
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,12"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="{Binding AdvertisementStatus, StringFormat='Advertising: {0}'}" />
+
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <ui:TextBlock Text="Require encryption" FontTypography="BodyStrong" />
+              <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="Leave on: phones must pair before they can read reports. Can only be changed while stopped." />
+            </StackPanel>
+            <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                             IsChecked="{Binding RequireEncryption, Mode=TwoWay}"
+                             IsEnabled="{Binding IsRunning, Converter={StaticResource InverseBool}}" />
+          </Grid>
+
+          <ui:TextBlock FontTypography="Caption" Margin="0,0,0,12"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+            <Run Text="Listening for keys:" /> <Run Text="{Binding KeyboardSubscribers, Mode=OneWay}" />
+            <Run Text="   Listening for the mouse:" /> <Run Text="{Binding MouseSubscribers, Mode=OneWay}" />
+          </ui:TextBlock>
+
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <ui:TextBlock Text="Even pointer pacing" FontTypography="BodyStrong" />
+              <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap"
+                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                            Text="Spreads movement evenly so the phone's pointer moves smoothly. Off sends it in bursts. Takes effect at once." />
+            </StackPanel>
+            <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0"
+                             IsChecked="{Binding EvenPointerPacing, Source={x:Static services:AppSettings.Instance}, Mode=TwoWay}" />
+          </Grid>
+
+          <ui:TextBlock Text="Minimum pointer interval" FontTypography="BodyStrong" />
+          <ui:TextBlock FontTypography="Caption" TextWrapping="Wrap" Margin="0,0,0,4"
+                        Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                        Text="{Binding LinkIntervalMs, StringFormat='Paced to {0} ms right now: whichever is slower of this minimum and the connection interval the phone chose.'}" />
+          <StackPanel Orientation="Horizontal">
+            <Slider Width="200" Minimum="5" Maximum="50" TickFrequency="5" IsSnapToTickEnabled="True"
+                    VerticalAlignment="Center"
+                    Value="{Binding PointerIntervalMs, Mode=TwoWay}" />
+            <ui:TextBlock Width="52" Margin="12,0,0,0" VerticalAlignment="Center"
+                          Text="{Binding PointerIntervalMs, StringFormat='{}{0} ms'}" />
+          </StackPanel>
+        </StackPanel>
+      </ui:CardExpander>
 
   </StackPanel>
 </Page>

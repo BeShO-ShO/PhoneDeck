@@ -11,6 +11,12 @@ public enum DisplayRoute
 
     /// <summary>DeX cast to Windows' Wireless Display app, the backup for <see cref="Cast"/>.</summary>
     WirelessDisplayApp = 2,
+
+    /// <summary>
+    /// No picture on this PC: PhoneDeck is only the phone's Bluetooth keyboard and mouse, for DeX
+    /// on a separate monitor or TV.
+    /// </summary>
+    KeyboardOnly = 3,
 }
 
 public static class DisplayRoutes
@@ -21,12 +27,16 @@ public static class DisplayRoutes
     /// </summary>
     public static DisplayRoute FromSaved(int? saved, bool legacyWireless) => saved switch
     {
-        >= (int)DisplayRoute.CaptureDevice and <= (int)DisplayRoute.WirelessDisplayApp => (DisplayRoute)saved.Value,
+        >= (int)DisplayRoute.CaptureDevice and <= (int)DisplayRoute.KeyboardOnly => (DisplayRoute)saved.Value,
         _ => legacyWireless ? DisplayRoute.Cast : DisplayRoute.CaptureDevice,
     };
 
-    /// <summary>Home only offers capture device or wireless; Settings picks which receiver.</summary>
-    public static bool IsWireless(DisplayRoute route) => route != DisplayRoute.CaptureDevice;
+    /// <summary>Home offers one Wireless choice; Settings picks which receiver.</summary>
+    public static bool IsWireless(DisplayRoute route) =>
+        route is DisplayRoute.Cast or DisplayRoute.WirelessDisplayApp;
+
+    /// <summary>Whether the phone's screen is shown on this PC at all.</summary>
+    public static bool ShowsPicture(DisplayRoute route) => route != DisplayRoute.KeyboardOnly;
 
     /// <summary>The wireless route for the receiver chosen in Settings.</summary>
     public static DisplayRoute Wireless(bool useApp) => useApp ? DisplayRoute.WirelessDisplayApp : DisplayRoute.Cast;
@@ -42,11 +52,14 @@ public static class DisplayRoutes
     /// touch itself, and sending it too would double every touch.
     /// </summary>
     public static bool SendsTouch(DisplayRoute route, bool touchLayer) =>
-        route != DisplayRoute.WirelessDisplayApp && touchLayer;
+        route is DisplayRoute.CaptureDevice or DisplayRoute.Cast && touchLayer;
 
-    /// <summary>The app's cast ignores the pen, so PhoneDeck always sends it there.</summary>
+    /// <summary>
+    /// The app's cast ignores the pen, so PhoneDeck always sends it there. With no picture, the
+    /// PC's screen doesn't line up with the phone's, so neither touch nor pen is sent.
+    /// </summary>
     public static bool SendsPen(DisplayRoute route, bool touchLayer) =>
-        route == DisplayRoute.WirelessDisplayApp || touchLayer;
+        route == DisplayRoute.WirelessDisplayApp || (route != DisplayRoute.KeyboardOnly && touchLayer);
 }
 
 public enum CastState

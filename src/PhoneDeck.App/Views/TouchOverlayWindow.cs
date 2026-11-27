@@ -79,7 +79,7 @@ public sealed class TouchOverlayWindow : Window
         // Room for the navigation buttons centred and two (wireless: three) action buttons on the right.
         Width = wireless ? 800 : 720;
 
-        var pauseButton = MakeButton("Stop capture", PauseIcon);
+        var pauseButton = MakeButton("Back to this PC", PauseIcon);
         pauseButton.Click += (_, _) => _stopCapture();
 
         var fullScreenButton = MakeButton(wireless ? "Fill the screen or restore the window" : "Full screen or window", FullScreenIcon);

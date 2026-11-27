@@ -31,6 +31,14 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (Set(ref _startPeripheralOnLaunch, value)) Save(); }
     }
 
+    private bool _triggerPhoneRoutine;
+    /// <summary>Opens the phone's Audio for a moment when it connects, to start a routine on it.</summary>
+    public bool TriggerPhoneRoutine
+    {
+        get => _triggerPhoneRoutine;
+        set { if (Set(ref _triggerPhoneRoutine, value)) Save(); }
+    }
+
     private bool _enableCapsLockSwitch;
 
     /// <summary>
@@ -191,6 +199,8 @@ public sealed class AppSettings : INotifyPropertyChanged
             OnPropertyChanged(nameof(RouteIsWireless));
             OnPropertyChanged(nameof(RouteIsCast));
             OnPropertyChanged(nameof(RouteIsWirelessDisplayApp));
+            OnPropertyChanged(nameof(RouteIsKeyboardOnly));
+            OnPropertyChanged(nameof(RouteHasSoundAndTouch));
         }
     }
 
@@ -264,9 +274,23 @@ public sealed class AppSettings : INotifyPropertyChanged
         set { if (value) DisplayRoute = DisplayRoute.WirelessDisplayApp; }
     }
 
+    [JsonIgnore]
+    public bool RouteIsKeyboardOnly
+    {
+        get => DisplayRoute == DisplayRoute.KeyboardOnly;
+        set { if (value) DisplayRoute = DisplayRoute.KeyboardOnly; }
+    }
+
+    /// <summary>Home's sound and touch switches apply: the capture device or PhoneDeck's own receiver.</summary>
+    [JsonIgnore]
+    public bool RouteHasSoundAndTouch => DisplayRoute is DisplayRoute.CaptureDevice or DisplayRoute.Cast;
+
     private bool _openViewerWithCapture = true;
 
-    /// <summary>Whether starting capture also opens mpv on <see cref="ViewerVideoDevice"/>.</summary>
+    /// <summary>
+    /// No longer used: capture always opens the viewer when a video device is chosen. Kept so
+    /// older settings files still load.
+    /// </summary>
     public bool OpenViewerWithCapture
     {
         get => _openViewerWithCapture;

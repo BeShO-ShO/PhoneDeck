@@ -13,6 +13,7 @@ public class DisplayRouteTests
     [InlineData(0, true, DisplayRoute.CaptureDevice)]
     [InlineData(1, false, DisplayRoute.Cast)]
     [InlineData(2, false, DisplayRoute.WirelessDisplayApp)]
+    [InlineData(3, true, DisplayRoute.KeyboardOnly)]
     // Out of range is treated as never saved.
     [InlineData(7, false, DisplayRoute.CaptureDevice)]
     [InlineData(-1, true, DisplayRoute.Cast)]
@@ -30,6 +31,9 @@ public class DisplayRouteTests
     // The app carries touch but not the pen.
     [InlineData(DisplayRoute.WirelessDisplayApp, true, false, true)]
     [InlineData(DisplayRoute.WirelessDisplayApp, false, false, true)]
+    // No picture on this PC: nothing to touch.
+    [InlineData(DisplayRoute.KeyboardOnly, true, false, false)]
+    [InlineData(DisplayRoute.KeyboardOnly, false, false, false)]
     public void TouchAndPenFollowTheRoute(DisplayRoute route, bool touchLayer, bool touch, bool pen)
     {
         Assert.Equal(touch, DisplayRoutes.SendsTouch(route, touchLayer));
@@ -57,6 +61,11 @@ public class DisplayRouteTests
         Assert.False(DisplayRoutes.IsWireless(DisplayRoute.CaptureDevice));
         Assert.True(DisplayRoutes.IsWireless(DisplayRoute.Cast));
         Assert.True(DisplayRoutes.IsWireless(DisplayRoute.WirelessDisplayApp));
+        Assert.False(DisplayRoutes.IsWireless(DisplayRoute.KeyboardOnly));
+
+        Assert.True(DisplayRoutes.ShowsPicture(DisplayRoute.CaptureDevice));
+        Assert.True(DisplayRoutes.ShowsPicture(DisplayRoute.WirelessDisplayApp));
+        Assert.False(DisplayRoutes.ShowsPicture(DisplayRoute.KeyboardOnly));
 
         Assert.Equal(DisplayRoute.Cast, DisplayRoutes.Wireless(useApp: false));
         Assert.Equal(DisplayRoute.WirelessDisplayApp, DisplayRoutes.Wireless(useApp: true));

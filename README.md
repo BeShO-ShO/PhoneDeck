@@ -59,16 +59,21 @@ Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
 2. Pair the phone with the PC from the phone's Bluetooth settings. In the PC's Bluetooth details
    on the phone, leave only **Input device** on: Media audio and Phone calls compete for the
    radio and add mouse lag.
-3. On Home, choose **Capture device** or **Wireless** to show the phone's screen. For a capture
-   device, pick it in Settings → Phone's screen.
+3. On Home, choose **Capture device** or **Wireless** to show the phone's screen, or **Keyboard
+   and mouse only** for DeX on a [separate monitor](#on-a-separate-monitor). For a capture
+   device, pick it in Settings → Capture device; Home then shows whether it is plugged in.
 4. Each time: open PhoneDeck, tap **Connect** for the PC on the phone, then click the phone's
-   picture, press **Ctrl+Alt+Q** or choose **Start capture**. See [Switching](#switching) for
+   picture, press **Ctrl+Alt+Q** or choose **Launch DeX**. See [Switching](#switching) for
    the ways back.
 
-<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: two connected phones, Start capture, where input goes, and how the phone's screen is shown" width="360">
+<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: the connected phone, Launch DeX, and how the phone's screen is shown" width="360">
 
-While capture is on, a small bar below the picture has **Split screen, Recents, Home and Back**,
-a full-screen button, and a button that turns capture off.
+While the phone has control, a small bar below the picture has **Split screen, Recents, Home and
+Back**, a full-screen button, and a button that returns to this PC.
+
+If more than one phone is connected, Home also lets you choose which one gets the keyboard and
+mouse. Details lists the shortcuts that are on, and has the log with **Copy** and **Open log
+file** buttons.
 
 ## Switching
 
@@ -96,7 +101,7 @@ of these ways on or off there.
 Any USB capture device that Windows sees as a camera should work. A **USB-C capture dongle**
 (USB-C in on one end, USB out on the other) is the most compact: plug the phone into it and it
 into the PC. A plain USB-C cable from the phone to the PC can't do this, even one that carries
-video: a PC's USB-C port can send video to a monitor but can't receive it. Starting capture opens
+video: a PC's USB-C port can send video to a monitor but can't receive it. Launch DeX opens
 PhoneDeck's viewer full screen. It picks the device's best mode, reads it with Windows' own
 low-latency capture, and draws each frame on the graphics card as soon as it arrives.
 
@@ -111,14 +116,14 @@ low-latency capture, and draws each frame on the graphics card as soon as it arr
   looks washed out with grey blacks, choose Limited. They apply instantly, with no added delay.
 
 **mpv as a backup.** If the built-in viewer doesn't work on your PC, choose **mpv** in Settings →
-Phone's screen. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer recommended) with
+Capture device. PhoneDeck then starts [mpv](https://mpv.io/) (0.42 or newer recommended) with
 low-delay options and follows its window for touch. To start mpv yourself, see
 [docs/MPV.md](docs/MPV.md).
 
 ### Wireless
 
 Choose **Wireless** on Home. While it is chosen, PhoneDeck listens for a cast, and Home shows
-whether it is ready. Cast DeX to the PC from the phone; starting capture shows it full screen.
+whether it is ready. Cast DeX to the PC from the phone; Launch DeX shows it full screen.
 
 - The first cast makes Windows ask to let PhoneDeck through the **firewall**. Allow it on private
   networks, or the phone can't reach it.
@@ -127,10 +132,24 @@ whether it is ready. Cast DeX to the PC from the phone; starting capture shows i
 - PhoneDeck only reads Windows' "Projecting to this PC" settings and never changes them. Close
   the Wireless Display app while using it, or the phone may cast there instead.
 
+**Starting DeX from the PC.** A Samsung **Modes and Routines** routine can start DeX and cast to
+the PC, but it only notices this PC's Bluetooth **Audio** or **Calls** connecting, never the
+keyboard and mouse. With **Start the phone's routine when it connects** on (Settings → Advanced),
+PhoneDeck opens the phone's Audio connection for 3 s, which starts the routine:
+
+- when the phone connects to PhoneDeck while Wireless is chosen, and
+- when you choose Wireless on Home. The routine only starts again after the phone has
+  disconnected, so PhoneDeck restarts its Bluetooth first: the keyboard and mouse drop for a few
+  seconds and the phone reconnects.
+
+Make the routine's condition this PC's Bluetooth connecting, and its actions start DeX and cast
+to the PC (casting needs a **touch macro** in the routine). The phone must be **unlocked**: a
+locked phone doesn't start DeX or cast.
+
 ### Wireless Display app (backup)
 
 If PhoneDeck can't receive the cast on your PC, choose **Wireless Display app** in Settings →
-Receive Wireless with. Starting capture then opens the app if it isn't open; cast DeX to the PC
+Wireless → Receive the cast with. Launch DeX then opens the app if it isn't open; cast DeX to the PC
 from the phone.
 
 - **Touch** works through the cast itself. PhoneDeck adds the keyboard, mouse and pen.
@@ -145,13 +164,13 @@ DeX can also go straight to a monitor or TV: a USB-C cable that carries video in
 monitor, or a USB-C to HDMI adapter. PhoneDeck then only sends the PC's keyboard and mouse,
 with no capture device or Wi-Fi needed and no added delay.
 
-1. On Home, choose **Capture device** and turn off **Open the phone's screen**, so no viewer
-   opens.
-2. Tap **Connect** on the phone and press **Ctrl+Alt+Q**. The keyboard and mouse now control
-   DeX on the monitor; press it again to return them to the PC.
+1. On Home, choose **Keyboard and mouse only**. No viewer or bar opens, and touch and pen aren't
+   sent.
+2. Tap **Connect** on the phone and press **Ctrl+Alt+Q** or choose **Launch DeX**. The keyboard
+   and mouse now control DeX on the monitor; press the hotkey again, or tap Ctrl+Alt, to return
+   them to the PC.
 
-The PC's touchscreen and pen don't line up with a picture on another monitor, so leave
-**Use the touchscreen** off. A touch monitor may handle touch itself over its USB-C cable.
+A touch monitor may handle touch itself over its USB-C cable.
 
 ## Tips
 
@@ -203,8 +222,9 @@ zips to a GitHub release.
   settings).
 - **Pen does nothing** after updating from an older PhoneDeck: pair again as above. Fingers work
   without re-pairing.
-- **No picture in the built-in viewer**: check the device in Settings → Phone's screen, and close
-  any other app using it (Details → Logs says why). If it still fails, switch to mpv.
+- **No picture in the built-in viewer**: check that Home says the device is plugged in and that
+  it is the one chosen in Settings → Capture device, and close any other app using it (Details →
+  Logs says why). If it still fails, switch to mpv.
 - **The phone can't find the PC to cast to, or the cast fails**: check that Home says it is
   ready, that the Wireless Display app is closed, and that PhoneDeck is allowed through the
   firewall. If it still fails, use the Wireless Display app (Settings → Receive Wireless with).

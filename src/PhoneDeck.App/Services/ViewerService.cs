@@ -64,17 +64,18 @@ public sealed class ViewerService
     public static bool IsConfigured => AppSettings.Instance.ViewerVideoDevice is not null;
 
     /// <summary>
-    /// Opens mpv unless it is already open. Capture only does this while the Home switch is on;
-    /// <paramref name="evenIfSwitchedOff"/> is for the Open now button. Returns a problem to show, or null.
+    /// Opens the viewer (or mpv) unless it is already open. Capture always does this when a
+    /// video device is chosen; with none (a separate monitor), nothing opens. Returns a problem
+    /// to show, or null.
     /// </summary>
-    public string? EnsureRunning(Action<string> log, bool evenIfSwitchedOff = false)
+    public string? EnsureRunning(Action<string> log)
     {
         var settings = AppSettings.Instance;
         // The cast's window opens by itself when the phone connects; capture starting before
         // that opens it to wait, so the picture lands where the bar and touch expect it.
+        if (!DisplayRoutes.ShowsPicture(settings.DisplayRoute)) return null;
         if (settings.DisplayRoute == DisplayRoute.Cast) return EnsureCastWindow(CastService.Instance.CurrentPlayer, log);
         if (_builtInIsCast) Stop();
-        if (!settings.OpenViewerWithCapture && !evenIfSwitchedOff) return null;
         if (settings.ViewerVideoDevice is not { } video) return null;
         string? audio = null;
         if (settings.ViewerSound)

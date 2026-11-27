@@ -21,6 +21,7 @@ public partial class App : Application
     private ControlIndicator? _indicator;
     private bool _redirectUiActive;
     private bool _redirectWireless;
+    private bool _redirectNoPicture;
 
     public new static App Current => (App)Application.Current;
 
@@ -90,6 +91,7 @@ public partial class App : Application
             {
                 ViewerService.Instance.Stop();
                 CastService.Instance.Apply(peripheral.LogApp);
+                TriggerRoutineWhenReceiving();
             });
         };
 
@@ -102,12 +104,10 @@ public partial class App : Application
         else if (AppSettings.Instance.StartPeripheralOnLaunch) _ = PeripheralService.Instance.StartAsync();
     }
 
-    // A tray-only launch has no UI to arm capture from, so the hotkeys have to work on their own.
-    private static async Task StartResidentAsync()
-    {
-        await PeripheralService.Instance.StartAsync();
-        await PeripheralService.Instance.StartCaptureAsync(armEarly: true);
-    }
+    // A tray-only launch has no window, so the peripheral always starts. Capture is not armed:
+    // the hotkey and clicking the picture start it, as after a normal launch. (It used to be armed
+    // on This PC so the target-cycling keys could reach the phone; both are gone.)
+    private static async Task StartResidentAsync() => await PeripheralService.Instance.StartAsync();
 
     /// <summary>
     /// The holder may be another copy of this app or the CLI's background service; either way it
@@ -175,6 +175,14 @@ public partial class App : Application
             // In wireless mode the bar is the only way to reach fill screen and send to back, and
             // the pen, so it shows whatever the touch switch says.
             _redirectWireless = AppSettings.Instance.DisplayRoute == DisplayRoute.WirelessDisplayApp;
+            _redirectNoPicture = !DisplayRoutes.ShowsPicture(AppSettings.Instance.DisplayRoute);
+            if (_redirectNoPicture)
+            {
+                // Keyboard and mouse only: DeX is on another screen, so there is no viewer and no
+                // bar, and the keys (or the hotkey) bring control back.
+                if (AppSettings.Instance.ShowControlIndicator) _indicator?.Show(ControlMessage(peripheral.Target));
+                return;
+            }
             if (_redirectWireless)
             {
                 // Opened if needed but never closed by PhoneDeck: closing it ends the cast.
@@ -207,7 +215,7 @@ public partial class App : Application
             _redirectUiActive = false;
             Tray?.SetLive(false);
             if (AppSettings.Instance.ShowControlIndicator && !_exiting) _indicator?.Show("Back on this PC");
-            if (!_exiting && !_redirectWireless) ViewerService.Instance.SetCaptureMode(false);
+            if (!_exiting && !_redirectWireless && !_redirectNoPicture) ViewerService.Instance.SetCaptureMode(false);
             _touchLayer?.Close();
             _touchLayer = null;
             // Window order is left exactly as it is: the main window stays behind.
@@ -265,11 +273,52 @@ public partial class App : Application
         MainWindow.Activate();
     }
 
+    /// <summary>
+    /// After choosing Wireless, starts the phone's routine once PhoneDeck's receiver is listening,
+    /// or straight away for the Wireless Display app. Earlier, the routine's cast could reach
+    /// Windows' own receiver while PhoneDeck's was still starting.
+    /// </summary>
+    private void TriggerRoutineWhenReceiving()
+    {
+        var route = AppSettings.Instance.DisplayRoute;
+        if (!AppSettings.Instance.TriggerPhoneRoutine || !DisplayRoutes.IsWireless(route)) return;
+        if (route != DisplayRoute.Cast)
+        {
+            _ = PeripheralService.Instance.RestartForRoutineAsync();
+            return;
+        }
+
+        var cast = CastService.Instance;
+        void Check()
+        {
+            if (_exiting || AppSettings.Instance.DisplayRoute != DisplayRoute.Cast)
+            {
+                cast.StatusChanged -= OnStatus;
+                return;
+            }
+            switch (cast.Status.State)
+            {
+                case CastState.Waiting:
+                    cast.StatusChanged -= OnStatus;
+                    _ = PeripheralService.Instance.RestartForRoutineAsync();
+                    break;
+                case CastState.Connected or CastState.Failed or CastState.Unsupported:
+                    cast.StatusChanged -= OnStatus;
+                    break;
+            }
+        }
+        void OnStatus() => Dispatcher.BeginInvoke(Check);
+        cast.StatusChanged += OnStatus;
+        Check();
+    }
+
     public async void ExitApplication()
     {
         if (_exiting) return;
         _exiting = true;
         PeripheralService.Instance.LogApp("exiting");
+        // Ending a cast can take up to about 30 s (CastRetryWindow), so the window goes at once.
+        MainWindow?.Hide();
         // A failed stop must not strand the app: _exiting is already set, so Exit would never retry.
         try { await PeripheralService.Instance.StopAsync(); }
         catch (Exception ex) { Report(ex); }
@@ -278,7 +327,7 @@ public partial class App : Application
         _indicator?.Close();
         // The window lets go of the cast's picture before the cast's player is closed.
         ViewerService.Instance.Stop();
-        try { CastService.Instance.Stop(); }
+        try { await CastService.Instance.StopForExitAsync(); }
         catch (Exception ex) { Report(ex); }
         // A filled window would otherwise be remembered with its title bar off screen.
         try { WirelessDisplay.RestoreIfFilled(); }

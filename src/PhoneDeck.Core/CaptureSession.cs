@@ -184,6 +184,7 @@ public static class CaptureSession
     /// same hotkey drops to the local target instead and capture keeps running.
     /// </param>
     /// <param name="chordSwitch">Whether Ctrl+D+C switches target as well as Ctrl+Alt+CapsLock.</param>
+    /// <param name="switchGesture">Whether the shake-to-switch file is read at all.</param>
     /// <param name="penGoesToHost">Null means the same as <paramref name="touchGoesToHost"/>.</param>
     /// <param name="evenPacing">
     /// Read per report like <paramref name="mouseIntervalMs"/>. Null means on.
@@ -203,7 +204,8 @@ public static class CaptureSession
         bool? penGoesToHost = null,
         Hotkey? stopHotkey = null,
         bool ctrlAltTapReturns = false,
-        bool copilotKeyReturns = false)
+        bool copilotKeyReturns = false,
+        bool switchGesture = true)
     {
         evenPacing ??= () => true;
         var hotkey = stopHotkey is { IsValid: true } chosen ? chosen : Hotkey.Default;
@@ -218,10 +220,14 @@ public static class CaptureSession
         using var registration = cancellationToken.Register(() => stopped.TrySetResult());
 
         // The pointer switch gesture is opt-in via a JSON file, and that file is watched so a
-        // toggle from the UI or another CLI instance reaches this session without a restart.
-        using var gestureWatcher = new SwitchGestureWatcher(AppPaths.SwitchGestureConfig);
-        ApplyGesture(gestureWatcher.Current);
-        gestureWatcher.Changed += ApplyGesture;
+        // toggle from another CLI instance reaches this session without a restart. The app has no
+        // target cycling and passes switchGesture: false, so the file is ignored there.
+        using var gestureWatcher = switchGesture ? new SwitchGestureWatcher(AppPaths.SwitchGestureConfig) : null;
+        if (gestureWatcher is not null)
+        {
+            ApplyGesture(gestureWatcher.Current);
+            gestureWatcher.Changed += ApplyGesture;
+        }
 
         void ApplyGesture(SwitchGestureOptions options)
         {

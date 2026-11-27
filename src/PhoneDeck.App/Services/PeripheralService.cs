@@ -63,8 +63,27 @@ public sealed class PeripheralService : INotifyPropertyChanged
     /// <summary>Capture is on but nothing is leaving this PC, which looks like capture being broken.</summary>
     public bool IsCapturingLocally => IsCapturing && _inputLocal;
 
+    /// <summary>More than one phone is connected, so Home lets you pick which one gets input.</summary>
+    public bool HasPhoneChoice => Targets.Count > 1;
+
     /// <summary>Running with nothing live: after a restart the phone has to be told to reconnect.</summary>
-    public bool NeedsReconnect => IsRunning && KeyboardSubscribers == 0;
+    public bool NeedsReconnect => IsRunning && KeyboardSubscribers == 0 && !ReconnectingForRoutine;
+
+    private bool _reconnectingForRoutine;
+    /// <summary>Bluetooth is restarting so the phone's routine can start; Home doesn't say it's off.</summary>
+    public bool ReconnectingForRoutine
+    {
+        get => _reconnectingForRoutine;
+        private set
+        {
+            Set(ref _reconnectingForRoutine, value);
+            OnPropertyChanged(nameof(NeedsReconnect));
+            OnPropertyChanged(nameof(ShowBluetoothOff));
+        }
+    }
+
+    /// <summary>Home's "Bluetooth is off" bar, which a restart for the routine doesn't show.</summary>
+    public bool ShowBluetoothOff => !IsRunning && !ReconnectingForRoutine;
 
     private string _headline = "Bluetooth is off";
     /// <summary>The home screen's main line: the connected device, or what is missing.</summary>
@@ -73,7 +92,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
     private string _detail = "Starting…";
     public string Detail { get => _detail; private set => Set(ref _detail, value); }
 
-    public string CaptureButtonText => IsCapturing ? "Stop capture" : "Start capture";
+    public string CaptureButtonText => IsCapturing ? "Back to this PC" : "Launch DeX";
 
     public bool CanToggleCapture => IsCapturing || CanCapture;
 
@@ -202,12 +221,17 @@ public sealed class PeripheralService : INotifyPropertyChanged
             IsRunning = false;
             Hosts.Clear();
             Targets.Clear();
+            _routineTrigger.Reset();
+            OnPropertyChanged(nameof(HasPhoneChoice));
             _hostSignature = null;
             AdvertisementStatus = "Stopped";
             KeyboardSubscribers = MouseSubscribers = 0;
             ConnectionText = ConnectionSummary.Describe(false, []);
-            Headline = "Bluetooth is off";
-            Detail = "Start it from the Details page.";
+            if (!ReconnectingForRoutine)
+            {
+                Headline = "Bluetooth is off";
+                Detail = "Start it from the Details page.";
+            }
             Target = "nothing yet";
             Append("peripheral stopped");
         }
@@ -235,6 +259,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
                 RebuildTargets();
                 RestoreLastTarget();
             }
+            FireRoutineTriggers();
 
             SyncTargetState();
         }
@@ -243,6 +268,71 @@ public sealed class PeripheralService : INotifyPropertyChanged
             _refreshingHosts = false;
         }
     }
+
+    private readonly RoutineTrigger _routineTrigger = new();
+
+    /// <summary>
+    /// A phone that just connected gets its routine started, if that is switched on and Wireless is
+    /// chosen: the routine casts, which isn't wanted with a capture device or a separate monitor.
+    /// </summary>
+    private void FireRoutineTriggers()
+    {
+        // Tracked even while switched off, so turning it on doesn't fire for a phone already connected.
+        var fire = _routineTrigger.Update(Hosts.Select(h => h.DeviceId), Environment.TickCount64);
+        if (!AppSettings.Instance.TriggerPhoneRoutine
+            || !DisplayRoutes.IsWireless(AppSettings.Instance.DisplayRoute)) return;
+        foreach (var host in Hosts.Where(h => fire.Contains(h.DeviceId, StringComparer.OrdinalIgnoreCase)))
+            RoutineTriggerService.Fire(host, LogFromAnyThread);
+    }
+
+    /// <summary>
+    /// Starts the phone's routine because you chose Wireless. A routine runs while this PC stays
+    /// connected and only starts again after it disconnects, and the keyboard and mouse keep it
+    /// connected. So Bluetooth is restarted here: the phone disconnects, the routine ends, and when
+    /// the phone reconnects the trigger fires as on a fresh start (27 Nov 2026).
+    /// </summary>
+    public async Task RestartForRoutineAsync()
+    {
+        if (!AppSettings.Instance.TriggerPhoneRoutine || !IsRunning || IsBusy || IsCapturing) return;
+        var phones = Hosts.ToList();
+        if (phones.Count == 0) return; // nothing connected: the next connect fires by itself
+
+        var phone = phones.FirstOrDefault(p => string.Equals(p.DeviceId, AppSettings.Instance.LastHostId, StringComparison.OrdinalIgnoreCase))
+                    ?? phones[0];
+        bool PhoneIsBack() => Hosts.Any(h => string.Equals(h.DeviceId, phone.DeviceId, StringComparison.OrdinalIgnoreCase));
+
+        LogApp("routine: you chose Wireless; disconnecting the keyboard and mouse so the phone's routine can start again");
+        // Home stays as it is meanwhile, apart from Launch DeX being unavailable: the brief
+        // "Bluetooth is off" looked like something had gone wrong.
+        ReconnectingForRoutine = true;
+        try
+        {
+            await StopAsync();
+            // Windows goes on showing the phone connected (its Audio and Calls link stays), so
+            // there is nothing to wait for; the phone drops the keyboard and mouse as soon as
+            // they're gone, and this pause lets its routine end (27 Nov 2026: waiting for Windows
+            // took the full 10 s).
+            await Task.Delay(RoutineTrigger.DisconnectPause);
+            foreach (var each in phones) _routineTrigger.Forget(each.DeviceId);
+            await StartAsync();
+
+            // The phone usually reconnects by itself, and the connect fires the trigger.
+            var end = Environment.TickCount64 + (long)RoutineTrigger.ReconnectWait.TotalMilliseconds;
+            while (IsRunning && !PhoneIsBack() && Environment.TickCount64 < end) await Task.Delay(250);
+        }
+        finally
+        {
+            ReconnectingForRoutine = false;
+        }
+
+        // If it doesn't, opening its Audio fires the routine anyway.
+        if (!IsRunning || !DisplayRoutes.IsWireless(AppSettings.Instance.DisplayRoute) || PhoneIsBack()) return;
+        LogApp($"routine: {phone.Name ?? phone.Address} didn't reconnect; opening its Audio anyway");
+        _routineTrigger.NoteFired(phone.DeviceId, Environment.TickCount64);
+        RoutineTriggerService.Fire(phone, LogFromAnyThread);
+    }
+
+    private void LogFromAnyThread(string message) => _dispatcher.BeginInvoke(() => LogApp(message));
 
     public void Select(TargetOption option)
     {
@@ -343,13 +433,9 @@ public sealed class PeripheralService : INotifyPropertyChanged
             });
         }
 
-        Targets.Add(new TargetOption
-        {
-            Title = "This PC",
-            Detail = "Capture stays armed but keystrokes are passed through locally.",
-            Kind = TargetKind.Local
-        });
-
+        // "This PC" is no longer offered: switching between the phone and this PC does that job.
+        // Home shows the list only when there is a choice to make.
+        OnPropertyChanged(nameof(HasPhoneChoice));
         SyncSelection();
     }
 
@@ -404,9 +490,11 @@ public sealed class PeripheralService : INotifyPropertyChanged
             try
             {
                 await CaptureSession.RunAsync(peripheral, Append, verbose: false, () => PointerIntervalMs,
-                    stopEndsSession: true, token, chordSwitch: AppSettings.Instance.EnableCtrlDCSwitch,
+                    // No target cycling in the app: switching between the phone and this PC replaced it.
+                    stopEndsSession: true, token, chordSwitch: false,
                     touchGoesToHost: touchGoesToHost,
-                    capsLockSwitch: AppSettings.Instance.EnableCapsLockSwitch,
+                    capsLockSwitch: false,
+                    switchGesture: false,
                     evenPacing: () => AppSettings.Instance.EvenPointerPacing,
                     penGoesToHost: penGoesToHost,
                     stopHotkey: settings.CaptureHotkeyValue,
@@ -502,17 +590,21 @@ public sealed class PeripheralService : INotifyPropertyChanged
         var hostNames = _peripheral.Hosts()
             .Select(h => h.Name is { Length: > 0 } name ? name : h.Address).ToList();
         ConnectionText = ConnectionSummary.Describe(true, hostNames);
-        Headline = hostNames.Count switch
+        // While reconnecting for the routine, the phone's name stays until it is back.
+        if (!ReconnectingForRoutine || hostNames.Count > 0)
         {
-            0 => "No phone connected",
-            1 => hostNames[0],
-            _ => $"{hostNames.Count} devices connected"
-        };
-        Detail = hostNames.Count == 0
-            ? "On your phone, tap Connect for this PC in Bluetooth settings."
-            : _peripheral.ConnectionIntervalMs(_peripheral.SelectedHostId) is { } linkMs
-                ? $"Connected · Bluetooth link {linkMs} ms"
-                : "Connected";
+            Headline = hostNames.Count switch
+            {
+                0 => "No phone connected",
+                1 => hostNames[0],
+                _ => $"{hostNames.Count} devices connected"
+            };
+            Detail = hostNames.Count == 0
+                ? "On your phone, tap Connect for this PC in Bluetooth settings."
+                : _peripheral.ConnectionIntervalMs(_peripheral.SelectedHostId) is { } linkMs
+                    ? $"Connected · Bluetooth link {linkMs} ms"
+                    : "Connected";
+        }
         // Ctrl+D+C changes the target without going through the UI, so mirror it back.
         SyncTargetState();
         LinkIntervalMs = _peripheral.MouseReportIntervalMs(PointerIntervalMs);
@@ -529,6 +621,8 @@ public sealed class PeripheralService : INotifyPropertyChanged
     // though the page's copy is added later on the UI thread. Each line is flushed as written,
     // so the file is complete when the process ends.
     private readonly SessionLog _file = new(AppPaths.InLogs("PhoneDeck-session.log"));
+
+    public string LogFilePath => _file.Path;
 
     private void Append(string message)
     {
@@ -563,6 +657,7 @@ public sealed class PeripheralService : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanCapture));
             OnPropertyChanged(nameof(NeedsReconnect));
             OnPropertyChanged(nameof(CanToggleCapture));
+            OnPropertyChanged(nameof(ShowBluetoothOff));
         }
         if (name is nameof(IsCapturing))
         {
