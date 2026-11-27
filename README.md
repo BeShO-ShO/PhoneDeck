@@ -66,7 +66,7 @@ Samsung Galaxy S26 Ultra and a Galaxy S22 Ultra in DeX.
    picture, press **Ctrl+Alt+Q** or choose **Launch DeX**. See [Switching](#switching) for
    the ways back.
 
-<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: the connected phone, Launch DeX, and how the phone's screen is shown" width="360">
+<img src="docs/screenshots/phonedeck-home.png" alt="PhoneDeck's Home page: the connected phone, Launch DeX, and how the phone's screen is shown" width="420">
 
 While the phone has control, a small bar below the picture has **Split screen, Recents, Home and
 Back**, a full-screen button, and a button that returns to this PC.
